@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOM Physics - Squares Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: #1a1a1a;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    
+    #world {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      background: #2a2a2a;
+      border: 2px solid #444;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .square {
+      position: absolute;
+      width: 30px;
+      height: 30px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+    
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 12px;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <div id="world">
+    <div class="controls">
+      <div>Click to add squares</div>
+      <div>Hover to push them</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { World, Body } from '/dist/index.js';
+    
+    const worldElement = document.getElementById('world');
+    const world = new World(worldElement, {
+      gravity: 300,
+      friction: 0.98,
+      restitution: 0.7
+    });
+    
+    const bodies = [];
+    
+    // Create initial squares
+    function createSquare(x, y) {
+      const square = document.createElement('div');
+      square.className = 'square';
+      square.style.left = x + 'px';
+      square.style.top = y + 'px';
+      worldElement.appendChild(square);
+      
+      const body = new Body(square, world, {
+        mass: 1,
+        radius: 15,
+        restitution: 0.7
+      });
+      
+      world.registerBody(body);
+      bodies.push(body);
+      
+      return body;
+    }
+    
+    // Create a grid of squares
+    for (let i = 0; i < 10; i++) {
+      for (let j = 0; j < 8; j++) {
+        createSquare(50 + i * 70, 50 + j * 60);
+      }
+    }
+    
+    world.start();
+    
+    // Click to add squares
+    worldElement.addEventListener('click', (e) => {
+      const rect = worldElement.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      createSquare(x - 15, y - 15);
+    });
+    
+    // Hover to push
+    worldElement.addEventListener('mousemove', (e) => {
+      const rect = worldElement.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      
+      bodies.forEach(body => {
+        const pos = body.getWorldPosition();
+        const dx = pos.x - mx;
+        const dy = pos.y - my;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 100 && dist > 0) {
+          const force = (100 - dist) * 2;
+          body.applyForce(
+            (dx / dist) * force,
+            (dy / dist) * force
+          );
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOM Physics - Stack Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: #0f0f0f;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    
+    #world {
+      position: relative;
+      width: 600px;
+      height: 700px;
+      background: #1a1a1a;
+      border: 2px solid #333;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .block {
+      position: absolute;
+      height: 30px;
+      border-radius: 2px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+    
+    .block.wide { width: 200px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .block.medium { width: 150px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .block.narrow { width: 100px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 12px;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <div id="world">
+    <div class="controls">
+      <div>Click to add blocks</div>
+      <div>Watch them stack!</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { World, Body } from '/dist/index.js';
+    
+    const worldElement = document.getElementById('world');
+    const world = new World(worldElement, {
+      gravity: 400,
+      friction: 0.95,
+      restitution: 0.3
+    });
+    
+    const bodies = [];
+    let blockCount = 0;
+    
+    function createBlock(x, y, width, className) {
+      const block = document.createElement('div');
+      block.className = `block ${className}`;
+      block.style.left = x + 'px';
+      block.style.top = y + 'px';
+      worldElement.appendChild(block);
+      
+      const body = new Body(block, world, {
+        mass: width / 50, // Wider blocks are heavier
+        radius: width / 2,
+        restitution: 0.3
+      });
+      
+      world.registerBody(body);
+      bodies.push(body);
+      
+      return body;
+    }
+    
+    // Create initial stack
+    const startX = 300;
+    const startY = 100;
+    const widths = [200, 150, 100];
+    const classes = ['wide', 'medium', 'narrow'];
+    
+    for (let i = 0; i < 8; i++) {
+      const width = widths[i % widths.length];
+      const className = classes[i % classes.length];
+      createBlock(startX - width / 2, startY + i * 35, width, className);
+    }
+    
+    world.start();
+    
+    // Click to add blocks at random positions
+    worldElement.addEventListener('click', (e) => {
+      const rect = worldElement.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const width = widths[blockCount % widths.length];
+      const className = classes[blockCount % classes.length];
+      createBlock(x - width / 2, y, width, className);
+      blockCount++;
+    });
+  </script>
+</body>
+</html>

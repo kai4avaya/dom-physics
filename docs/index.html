@@ -1,37 +1,4 @@
-#!/usr/bin/env node
-
-const fs = require('fs');
-const path = require('path');
-
-// Copy demo-package to docs/ and fix import paths for GitHub Pages
-const sourceDir = path.join(__dirname, '..', 'demo-package');
-const destDir = path.join(__dirname, '..', 'docs');
-
-// Ensure docs directory exists
-if (!fs.existsSync(destDir)) {
-  fs.mkdirSync(destDir, { recursive: true });
-}
-
-// Copy all files from demo-package to docs
-const files = fs.readdirSync(sourceDir);
-files.forEach(file => {
-  const sourcePath = path.join(sourceDir, file);
-  const destPath = path.join(destDir, file);
-  
-  if (fs.statSync(sourcePath).isFile()) {
-    let content = fs.readFileSync(sourcePath, 'utf8');
-    
-    // Fix import paths: /dist/index.js -> ./dist/index.js
-    if (file.endsWith('.html')) {
-      content = content.replace(/from ['"]\/dist\/index\.js['"]/g, "from './dist/index.js'");
-    }
-    
-    fs.writeFileSync(destPath, content);
-  }
-});
-
-// Create index.html that links to all demos
-const indexContent = `<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -133,8 +100,4 @@ const indexContent = `<!DOCTYPE html>
     </div>
   </div>
 </body>
-</html>`;
-
-fs.writeFileSync(path.join(destDir, 'index.html'), indexContent);
-
-console.log('✅ Prepared demo files for GitHub Pages');
+</html>

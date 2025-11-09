@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOM Physics - Bouncing Balls Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    
+    #world {
+      position: relative;
+      width: 600px;
+      height: 600px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+    
+    .ball {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .ball:nth-child(1) { background: #ff6b6b; }
+    .ball:nth-child(2) { background: #4ecdc4; }
+    .ball:nth-child(3) { background: #ffe66d; }
+    .ball:nth-child(4) { background: #95e1d3; }
+    .ball:nth-child(5) { background: #f38181; }
+    .ball:nth-child(6) { background: #aa96da; }
+  </style>
+</head>
+<body>
+  <div id="world"></div>
+
+  <script type="module">
+    import { World, Body } from '/dist/index.js';
+    
+    const worldElement = document.getElementById('world');
+    const world = new World(worldElement, {
+      gravity: 200,
+      friction: 0.99,
+      restitution: 0.9
+    });
+    
+    const colors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3', '#f38181', '#aa96da'];
+    
+    // Create balls in a circle
+    const centerX = 300;
+    const centerY = 300;
+    const radius = 200;
+    const numBalls = 6;
+    
+    for (let i = 0; i < numBalls; i++) {
+      const angle = (i / numBalls) * Math.PI * 2;
+      const x = centerX + Math.cos(angle) * radius;
+      const y = centerY + Math.sin(angle) * radius;
+      
+      const ball = document.createElement('div');
+      ball.className = 'ball';
+      ball.style.left = (x - 20) + 'px';
+      ball.style.top = (y - 20) + 'px';
+      ball.style.background = colors[i];
+      worldElement.appendChild(ball);
+      
+      const body = new Body(ball, world, {
+        mass: 1,
+        radius: 20,
+        restitution: 0.9
+      });
+      
+      // Give initial velocity
+      const vx = Math.cos(angle + Math.PI / 2) * 50;
+      const vy = Math.sin(angle + Math.PI / 2) * 50;
+      body.x = vx * 0.016; // Initial position offset
+      body.y = vy * 0.016;
+      body.prevX = 0;
+      body.prevY = 0;
+      
+      world.registerBody(body);
+    }
+    
+    world.start();
+  </script>
+</body>
+</html>

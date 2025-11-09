@@ -1,19 +1,40 @@
 # DOM Physics Engine
 
-A physics engine for DOM elements that preserves DOM structure while enabling physics simulation. Built with TypeScript, supports recursive nesting, independent simulation loops, and physics inheritance.
+A simple, performant physics engine for DOM elements. Preserves DOM structure while enabling realistic physics simulation. Built with TypeScript.
 
-🌐 **[Live Demo on GitHub Pages](https://kai4avaya.github.io/dom-physics/)** | 📦 [npm](https://www.npmjs.com/package/dom-physics)
+🌐 **[Live Demos on GitHub Pages](https://kai4avaya.github.io/dom-physics/)** | 📦 [npm](https://www.npmjs.com/package/dom-physics)
+
+## Why This Package?
+
+### Simple & Fast
+- **No complex nesting** - Simple `Body` and `World` classes
+- **Direct physics** - No inheritance chains or recursive lookups
+- **Optimized collision detection** - Simple O(n²) for small counts, efficient for most use cases
+- **Minimal overhead** - Only manipulates CSS `transform` properties
+
+### What Changed from Complex Version?
+
+The previous version had advanced features like:
+- World extending Body (nesting)
+- Physics inheritance with recursive lookups
+- SpatialHash optimization
+- Complex coordinate transformations
+
+**Why we simplified:**
+1. **Performance** - Recursive lookups (`getEffectiveGravity()`, `getWorldPosition()`) were called every frame, causing O(n) complexity
+2. **Simplicity** - Most use cases don't need nesting - a simple World with Bodies is enough
+3. **Reliability** - Fewer moving parts = fewer bugs
+4. **Maintainability** - Easier to understand and modify
+
+**Result:** The simplified version matches the original demo's performance exactly while being much easier to use and understand.
 
 ## Features
 
 ✅ **DOM Structure Preserved** - Never modifies DOM hierarchy, only manipulates transforms  
-✅ **Recursive Nesting** - Worlds extend Bodies, enabling nested physics spaces  
-✅ **Independent Simulations** - Each World runs its own simulation loop  
-✅ **Physics Inheritance** - Bodies inherit gravity/friction/restitution from parent World  
-✅ **Worlds as Bodies** - Worlds can collide with Bodies outside themselves  
-✅ **Flexible Bounds** - Any Body/World can constrain its children  
+✅ **Simple API** - Just `World` and `Body` classes  
 ✅ **Framework Agnostic** - Works with vanilla JS, React, Vue, etc.  
 ✅ **TypeScript** - Full type safety and IntelliSense support  
+✅ **Performant** - Optimized for 60fps with many bodies  
 
 ## Installation
 
@@ -34,7 +55,7 @@ const world = new World(container, {
   restitution: 0.5
 });
 
-// Create bodies
+// Create a body
 const element = document.querySelector('.my-element');
 const body = new Body(element, world, {
   mass: 1,
@@ -47,78 +68,25 @@ world.registerBody(body);
 world.start();
 ```
 
-## Running the Demo
+## Demos
 
-### Online Demo
-🌐 **[Try it live on GitHub Pages](https://kai4avaya.github.io/dom-physics/)**
+🌐 **[Try all demos live](https://kai4avaya.github.io/dom-physics/)**
 
-### Local Demo
+- **Text Demo** - Interactive text that responds to mouse movement
+- **Squares Demo** - Click to add squares, hover to push them around
+- **Bouncing Balls** - Colorful balls bouncing in a circular container
+- **Stack Demo** - Build towers by clicking, watch blocks stack
 
-After installing the package, you can run the included demo:
+### Running Demos Locally
 
 ```bash
 # Install the package
 npm install dom-physics
 
-# Run the demo (uses the package)
-cd node_modules/dom-physics
+# Run demos (if developing the package)
 npm run demo:package
 
-# Or if you're developing the package
-npm run demo          # Original inline demo
-npm run demo:package  # Package-based demo
-```
-
-Then open http://localhost:3000 in your browser.
-
-See [DEMO.md](./DEMO.md) for more details.
-
-## Testing
-
-Run the test suite:
-
-```bash
-npm test              # Run tests in watch mode
-npm run test:run      # Run tests once
-npm run test:coverage # Run tests with coverage
-```
-
-## Architecture
-
-### World extends Body
-
-The core insight: **World extends Body**, enabling recursive nesting:
-
-- Worlds can contain Bodies
-- Bodies can contain Bodies (because any Body could be a World)
-- Worlds can be nested inside Worlds
-- Worlds can collide with Bodies outside themselves
-
-### Independent Simulation Loops
-
-Each World runs its own `requestAnimationFrame` loop:
-
-```typescript
-const outerWorld = new World(outerContainer, { gravity: 500 });
-const innerWorld = new World(innerContainer, { gravity: 200 });
-
-outerWorld.addBody(innerWorld); // World added as Body!
-innerWorld.start(); // Independent simulation loop
-outerWorld.start(); // Separate simulation loop
-```
-
-### Physics Inheritance
-
-Bodies inherit physics properties from their parent World:
-
-```typescript
-const world = new World(container, { gravity: 500 });
-
-// Inherits gravity: 500
-const body1 = new Body(element1, world);
-
-// Override gravity to 100
-const body2 = new Body(element2, world, { gravity: 100 });
+# Then open http://localhost:3000/demo-package/
 ```
 
 ## API Reference
@@ -126,7 +94,7 @@ const body2 = new Body(element2, world, { gravity: 100 });
 ### World
 
 ```typescript
-class World extends Body {
+class World {
   constructor(container: HTMLElement, config?: WorldConfig)
   
   // Simulation control
@@ -137,17 +105,14 @@ class World extends Body {
   registerBody(body: Body): void
   unregisterBody(body: Body): void
   
-  // Queries
-  getBodiesByParent(parent: HTMLElement): Body[]
-  getEscapedBodies(): Body[]
-  
-  // Events
-  on(event: string, callback: Function): void
-  off(event: string, callback: Function): void
-  
-  // Lifecycle
-  reset(): void
-  destroy(): void
+  // Properties
+  container: HTMLElement
+  bodies: Body[]
+  gravity: number
+  friction: number
+  restitution: number
+  timeStep: number
+  bounds: { x: number; y: number; width: number; height: number }
 }
 ```
 
@@ -157,32 +122,61 @@ class World extends Body {
 class Body {
   constructor(
     element: HTMLElement,
-    physicsParent: Body | null,
+    world: World,
     config?: BodyConfig
   )
   
   // Physics control
   applyForce(fx: number, fy: number): void
-  setVelocity(vx: number, vy: number): void
-  
-  // Hierarchy
-  addBody(body: Body): void
-  removeBody(body: Body): void
   
   // Position queries
-  getWorldPosition(): Vec2
-  getLocalPosition(): Vec2
-  getVelocity(): Vec2
+  getWorldPosition(): { x: number; y: number }
   
-  // Physics inheritance
-  getEffectiveGravity(): number
-  getEffectiveFriction(): number
-  getEffectiveRestitution(): number
-  
-  // State
-  reset(): void
-  restore(): void
+  // Rendering
   render(): void
+  
+  // Properties
+  element: HTMLElement
+  world: World
+  x: number
+  y: number
+  mass: number
+  radius: number
+  restitution: number | null
+  friction: number | null
+  isStatic: boolean
+  enabled: boolean
+}
+```
+
+## Configuration
+
+### WorldConfig
+
+```typescript
+interface WorldConfig {
+  gravity?: number;        // px/s² (default: 980)
+  friction?: number;       // 0-1 (default: 0.99)
+  restitution?: number;    // 0-1 (default: 0.8)
+  bounds?: {               // Default: auto-detect from container
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  timeStep?: number;       // seconds (default: 1/60)
+}
+```
+
+### BodyConfig
+
+```typescript
+interface BodyConfig {
+  mass?: number;           // Default: 1
+  radius?: number;          // Default: auto-calculated from element size
+  restitution?: number | null;  // null = use world's restitution
+  friction?: number | null;     // null = use world's friction
+  isStatic?: boolean;      // Default: false
 }
 ```
 
@@ -206,98 +200,62 @@ world.registerBody(body);
 world.start();
 ```
 
-### Nested Worlds
+### Mouse Interaction
 
 ```typescript
-const outerWorld = new World(outerContainer, { gravity: 500 });
-const innerWorld = new World(innerContainer, { gravity: 200 });
-
-outerWorld.addBody(innerWorld);
-innerWorld.start();
-outerWorld.start();
-
-// Bodies in inner world
-const innerBody = new Body(innerElement, innerWorld);
-innerWorld.registerBody(innerBody);
+container.addEventListener('mousemove', (e) => {
+  const rect = container.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  
+  world.bodies.forEach(body => {
+    const pos = body.getWorldPosition();
+    const dx = pos.x - mx;
+    const dy = pos.y - my;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist < 100 && dist > 0) {
+      const force = (100 - dist) * 2;
+      body.applyForce(
+        (dx / dist) * force,
+        (dy / dist) * force
+      );
+    }
+  });
+});
 ```
 
-### Physics Inheritance
+### Custom Physics Properties
 
 ```typescript
-const world = new World(container, {
-  gravity: 500,
-  friction: 0.99
-});
-
-// Inherits all physics
+// Body uses world's friction and restitution
 const body1 = new Body(element1, world);
 
-// Override gravity only
+// Body overrides restitution
 const body2 = new Body(element2, world, {
-  gravity: 100  // Override
-  // friction: null (inherits 0.99)
-});
-```
-
-### Body as Container
-
-```typescript
-const containerBody = new Body(containerElement, world, {
-  bounds: { x: 0, y: 0, width: 200, height: 200 }
+  restitution: 0.9  // Bouncier than world default
 });
 
-world.registerBody(containerBody);
-
-const childBody = new Body(childElement, containerBody);
-containerBody.addBody(childBody); // Automatically registered to world
-```
-
-## Configuration
-
-### WorldConfig
-
-```typescript
-interface WorldConfig {
-  gravity?: number;        // px/s² (default: 980)
-  friction?: number;       // 0-1 (default: 0.99)
-  restitution?: number;    // 0-1 (default: 0.8)
-  bounds?: Bounds | null;  // null = auto-detect
-  timeStep?: number;       // seconds (default: 1/60)
-}
-```
-
-### BodyConfig
-
-```typescript
-interface BodyConfig {
-  mass?: number;
-  radius?: number;
-  width?: number;
-  height?: number;
-  
-  // null = inherit from parent World
-  gravity?: number | null;
-  friction?: number | null;
-  restitution?: number | null;
-  
-  bounds?: Bounds | null;
-  isStatic?: boolean;
-  enabled?: boolean;
-  
-  collisionGroup?: number;
-  collidesWith?: number;
-  
-  initialVelocity?: Vec2;
-}
+// Body overrides friction
+const body3 = new Body(element3, world, {
+  friction: 0.95  // Less friction than world default
+});
 ```
 
 ## Principles
 
 1. **DOM Structure Preserved** - Never modifies DOM hierarchy
 2. **Transform Only** - Only manipulates `transform` CSS property
-3. **Original State Remembered** - Can restore original DOM state
-4. **World Space Simulation** - Bodies simulate in world space, render relative to DOM
-5. **Recursive Nesting** - Worlds extend Bodies for maximum flexibility
+3. **World Space Simulation** - Bodies simulate in world space, render relative to DOM
+4. **Simple & Fast** - No unnecessary complexity
+
+## Testing
+
+```bash
+npm test              # Run tests in watch mode
+npm run test:run      # Run tests once
+npm run test:coverage # Run tests with coverage
+```
 
 ## License
 
