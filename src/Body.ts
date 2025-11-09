@@ -82,12 +82,19 @@ export class Body {
       'position', 'transform', 'display', 'zIndex'
     ]);
 
-    // Calculate world-space origin
+    // Calculate world-space origin (like original demo)
+    // For direct World children, this is relative to World container
+    // For nested bodies, this will be adjusted by getWorldPosition()
     const rootWorld = this.findRootWorld();
-    const worldRect = rootWorld?.container.getBoundingClientRect() 
-      ?? element.getBoundingClientRect();
-    this.originX = this.originalPosition.left - worldRect.left;
-    this.originY = this.originalPosition.top - worldRect.top;
+    if (rootWorld) {
+      const worldRect = rootWorld.container.getBoundingClientRect();
+      this.originX = this.originalPosition.left - worldRect.left;
+      this.originY = this.originalPosition.top - worldRect.top;
+    } else {
+      // Fallback if no World parent (shouldn't happen in normal use)
+      this.originX = this.originalPosition.left;
+      this.originY = this.originalPosition.top;
+    }
 
     // Initialize physics state
     this.x = config.initialVelocity?.x ?? 0;
@@ -230,13 +237,23 @@ export class Body {
 
   /**
    * Get world-space position (recursively walks up physics tree)
+   * Optimized: If parent is World, use simple addition (most common case)
    */
   getWorldPosition(): Vec2 {
+    // Fast path: Direct child of World (most common case)
+    if (this.physicsParent?.isWorld) {
+      return {
+        x: this.originX + this.x,
+        y: this.originY + this.y
+      };
+    }
+    
+    // General case: Walk up physics tree
     let worldX = this.originX + this.x;
     let worldY = this.originY + this.y;
     
     let parent = this.physicsParent;
-    while (parent) {
+    while (parent && !parent.isWorld) {
       worldX += parent.originX + parent.x;
       worldY += parent.originY + parent.y;
       parent = parent.physicsParent;

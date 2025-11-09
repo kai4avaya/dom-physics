@@ -2,6 +2,27 @@
 
 The `dom-physics` package includes two demo versions that you can run locally.
 
+## Quick Start - Run Demo Locally
+
+```bash
+# Clone or navigate to the package directory
+cd dom-physics
+
+# Install dependencies
+npm install
+
+# Build the package
+npm run build
+
+# Run the package demo (recommended)
+npm run demo:package
+
+# Or run the original inline demo
+npm run demo
+```
+
+Then open **http://localhost:3000** in your browser.
+
 ## Quick Start
 
 ### After Installing from npm

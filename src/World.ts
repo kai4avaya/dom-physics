@@ -156,8 +156,11 @@ export class World extends Body {
       body.render();
     }
     
-    // Render this World itself (if it has an element)
-    this.render();
+    // Only render World itself if it's nested (has a physics parent)
+    // Root World's container should not be transformed
+    if (this.physicsParent) {
+      this.render();
+    }
 
     this.rafId = requestAnimationFrame(this.loop);
   };
