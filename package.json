@@ -1,6 +1,6 @@
 {
   "name": "dom-physics",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A simple, performant physics engine for DOM elements. Preserves DOM structure while enabling realistic physics simulation.",
   "keywords": [
     "physics",
@@ -8,8 +8,11 @@
     "animation",
     "simulation",
     "collision",
-    "gravity",
-    "interactive"
+    "typescript",
+    "physics-engine",
+    "dom-physics",
+    "web-physics",
+    "browser-physics"
   ],
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -40,18 +43,6 @@
     "prepare:pages": "node scripts/prepare-pages.js",
     "prepublishOnly": "npm run build && npm run test:run"
   },
-  "keywords": [
-    "physics",
-    "dom",
-    "animation",
-    "simulation",
-    "collision",
-    "typescript",
-    "physics-engine",
-    "dom-physics",
-    "web-physics",
-    "browser-physics"
-  ],
   "author": "",
   "license": "MIT",
   "repository": {
