@@ -12,7 +12,7 @@
     }
     
     body {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #f5f5f5;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       overflow: hidden;
       display: flex;
@@ -25,11 +25,10 @@
       position: relative;
       width: 600px;
       height: 600px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      background: #ffffff;
+      border: 2px solid #333;
       border-radius: 50%;
       overflow: hidden;
-      backdrop-filter: blur(10px);
     }
     
     .ball {
@@ -37,15 +36,9 @@
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      background: #666;
+      border: 1px solid #333;
     }
-    
-    .ball:nth-child(1) { background: #ff6b6b; }
-    .ball:nth-child(2) { background: #4ecdc4; }
-    .ball:nth-child(3) { background: #ffe66d; }
-    .ball:nth-child(4) { background: #95e1d3; }
-    .ball:nth-child(5) { background: #f38181; }
-    .ball:nth-child(6) { background: #aa96da; }
   </style>
 </head>
 <body>
@@ -61,9 +54,7 @@
       restitution: 0.9
     });
     
-    const colors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3', '#f38181', '#aa96da'];
-    
-    // Create balls in a circle
+    // Create balls in a circle with initial velocities
     const centerX = 300;
     const centerY = 300;
     const radius = 200;
@@ -78,7 +69,6 @@
       ball.className = 'ball';
       ball.style.left = (x - 20) + 'px';
       ball.style.top = (y - 20) + 'px';
-      ball.style.background = colors[i];
       worldElement.appendChild(ball);
       
       const body = new Body(ball, world, {
@@ -87,13 +77,14 @@
         restitution: 0.9
       });
       
-      // Give initial velocity
-      const vx = Math.cos(angle + Math.PI / 2) * 50;
-      const vy = Math.sin(angle + Math.PI / 2) * 50;
-      body.x = vx * 0.016; // Initial position offset
-      body.y = vy * 0.016;
-      body.prevX = 0;
-      body.prevY = 0;
+      // Set initial velocity by setting prevX/prevY
+      // Velocity = (x - prevX) / dt, so prevX = x - velocity * dt
+      const vx = Math.cos(angle + Math.PI / 2) * 100;
+      const vy = Math.sin(angle + Math.PI / 2) * 100;
+      const dt = world.timeStep;
+      
+      body.prevX = body.x - vx * dt;
+      body.prevY = body.y - vy * dt;
       
       world.registerBody(body);
     }

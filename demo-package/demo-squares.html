@@ -12,7 +12,7 @@
     }
     
     body {
-      background: #1a1a1a;
+      background: #f5f5f5;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       overflow: hidden;
       display: flex;
@@ -25,9 +25,8 @@
       position: relative;
       width: 800px;
       height: 600px;
-      background: #2a2a2a;
-      border: 2px solid #444;
-      border-radius: 8px;
+      background: #ffffff;
+      border: 2px solid #333;
       overflow: hidden;
     }
     
@@ -35,18 +34,19 @@
       position: absolute;
       width: 30px;
       height: 30px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      border-radius: 4px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      background: #666;
+      border: 1px solid #333;
     }
     
     .controls {
       position: absolute;
       top: 10px;
       left: 10px;
-      color: white;
+      color: #333;
       font-size: 12px;
       z-index: 1000;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 5px;
     }
   </style>
 </head>
@@ -54,7 +54,7 @@
   <div id="world">
     <div class="controls">
       <div>Click to add squares</div>
-      <div>Hover to push them</div>
+      <div>Drag to move them</div>
     </div>
   </div>
 
@@ -69,6 +69,8 @@
     });
     
     const bodies = [];
+    let draggedBody = null;
+    let isDragging = false;
     
     // Create initial squares
     function createSquare(x, y) {
@@ -99,19 +101,15 @@
     
     world.start();
     
-    // Click to add squares
-    worldElement.addEventListener('click', (e) => {
-      const rect = worldElement.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      createSquare(x - 15, y - 15);
-    });
-    
-    // Hover to push
-    worldElement.addEventListener('mousemove', (e) => {
+    // Mouse drag interaction
+    worldElement.addEventListener('mousedown', (e) => {
       const rect = worldElement.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
+      
+      // Find closest body
+      let closestBody = null;
+      let minDist = Infinity;
       
       bodies.forEach(body => {
         const pos = body.getWorldPosition();
@@ -119,14 +117,46 @@
         const dy = pos.y - my;
         const dist = Math.sqrt(dx * dx + dy * dy);
         
-        if (dist < 100 && dist > 0) {
-          const force = (100 - dist) * 2;
-          body.applyForce(
-            (dx / dist) * force,
-            (dy / dist) * force
-          );
+        if (dist < 30 && dist < minDist) {
+          minDist = dist;
+          closestBody = body;
         }
       });
+      
+      if (closestBody) {
+        draggedBody = closestBody;
+        isDragging = true;
+      }
+    });
+    
+    worldElement.addEventListener('mousemove', (e) => {
+      if (isDragging && draggedBody) {
+        const rect = worldElement.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        
+        const pos = draggedBody.getWorldPosition();
+        const dx = mx - pos.x;
+        const dy = my - pos.y;
+        
+        // Apply force to drag
+        draggedBody.applyForce(dx * 10, dy * 10);
+      }
+    });
+    
+    worldElement.addEventListener('mouseup', () => {
+      isDragging = false;
+      draggedBody = null;
+    });
+    
+    // Click to add squares
+    worldElement.addEventListener('click', (e) => {
+      if (!isDragging) {
+        const rect = worldElement.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        createSquare(x - 15, y - 15);
+      }
     });
   </script>
 </body>
