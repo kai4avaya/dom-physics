@@ -1,0 +1,62 @@
+{
+  "name": "dom-physics",
+  "version": "0.1.0",
+  "description": "A physics engine for DOM elements that preserves DOM structure. Supports recursive nesting, independent simulation loops, and physics inheritance.",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "demo",
+    "demo-package",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "demo": "node scripts/serve-demo.js",
+    "demo:package": "node scripts/serve-demo.js --package",
+    "prepublishOnly": "npm run build && npm run test:run"
+  },
+  "keywords": [
+    "physics",
+    "dom",
+    "animation",
+    "simulation",
+    "collision",
+    "typescript",
+    "physics-engine",
+    "dom-physics",
+    "web-physics",
+    "browser-physics"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/dom-physics.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/dom-physics/issues"
+  },
+  "homepage": "https://github.com/yourusername/dom-physics#readme",
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0",
+    "@vitest/ui": "^1.0.0",
+    "jsdom": "^23.0.0",
+    "@types/node": "^20.0.0"
+  }
+}
