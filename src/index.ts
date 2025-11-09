@@ -1,7 +1,7 @@
 // Main exports
-export { Body } from './Body';
-export { World } from './World';
-export { SpatialHash } from './SpatialHash';
+export { Body } from './Body.js';
+export { World } from './World.js';
+export { SpatialHash } from './SpatialHash.js';
 
 // Type exports
 export type {
@@ -11,4 +11,4 @@ export type {
   Bounds,
   CollisionEvent,
   ParentInfo,
-} from './types';
+} from './types.js';

@@ -3,8 +3,8 @@ import type {
   BodyConfig,
   Bounds,
   ParentInfo,
-} from './types';
-import type { World } from './World';
+} from './types.js';
+import type { World } from './World.js';
 
 /**
  * Body class - Base for all physics entities

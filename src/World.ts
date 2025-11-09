@@ -1,9 +1,9 @@
-import { Body } from './Body';
-import { SpatialHash } from './SpatialHash';
+import { Body } from './Body.js';
+import { SpatialHash } from './SpatialHash.js';
 import type {
   WorldConfig,
   CollisionEvent,
-} from './types';
+} from './types.js';
 
 /**
  * World class - Extends Body to manage physics simulation

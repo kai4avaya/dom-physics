@@ -1,4 +1,4 @@
-import type { Body } from './Body';
+import type { Body } from './Body.js';
 
 /**
  * Spatial hash for collision optimization
