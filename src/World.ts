@@ -182,9 +182,9 @@ export class World extends Body {
     // Collision detection (includes Worlds as Bodies!)
     this.detectAndResolveCollisions();
 
-    // Apply bounds constraints (like original demo - World calls constrainToBounds on bodies)
+    // Apply bounds constraints (like original demo - World calls constrainBodyToBounds on bodies)
     for (const body of this.simulationBodies) {
-      this.constrainToBounds(body);
+      this.constrainBodyToBounds(body);
     }
   }
 
@@ -315,9 +315,10 @@ export class World extends Body {
 
   /**
    * Constrain body to world bounds (matches original demo exactly)
+   * World calls this on bodies, not bodies calling it themselves
    */
-  private constrainToBounds(body: Body): void {
-    if (body.isStatic || !body.enabled) return;
+  private constrainBodyToBounds(body: Body): void {
+    if (body.isStatic || !body.enabled || !this.bounds) return;
     
     const restitution = body.restitution !== null ? body.restitution : this.restitution;
     const pos = body.getWorldPosition();

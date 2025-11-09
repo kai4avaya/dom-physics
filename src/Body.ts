@@ -154,7 +154,7 @@ export class Body {
     let current: Body | null = this;
     while (current) {
       if (current.isWorld) {
-        return current as World;
+        return current as unknown as World;
       }
       current = current.physicsParent;
     }
@@ -200,7 +200,7 @@ export class Body {
    */
   private updateCachedWorld(): void {
     if (this.physicsParent?.isWorld) {
-      this.cachedWorld = this.physicsParent as World;
+      this.cachedWorld = this.physicsParent as unknown as World;
     } else {
       this.cachedWorld = null;
     }
@@ -222,7 +222,7 @@ export class Body {
     let parent = this.physicsParent;
     while (parent) {
       if (parent.isWorld) {
-        this.cachedWorld = parent as World; // Cache for next time
+        this.cachedWorld = parent as unknown as World; // Cache for next time
         return this.cachedWorld.gravity;
       }
       if (parent.gravity !== null) {
