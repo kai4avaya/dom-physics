@@ -182,13 +182,10 @@ export class World extends Body {
     // Collision detection (includes Worlds as Bodies!)
     this.detectAndResolveCollisions();
 
-    // Apply bounds constraints
+    // Apply bounds constraints (like original demo - World calls constrainToBounds on bodies)
     for (const body of this.simulationBodies) {
-      body.constrainToBounds();
+      this.constrainToBounds(body);
     }
-    
-    // Also constrain this World itself
-    this.constrainToBounds();
   }
 
   /**
@@ -256,7 +253,7 @@ export class World extends Body {
 
   /**
    * Resolve collision between two bodies
-   * Works for Body-Body, World-Body, World-World
+   * Matches original demo exactly
    */
   private resolveCollision(a: Body, b: Body): void {
     const posA = a.getWorldPosition();
@@ -282,7 +279,7 @@ export class World extends Body {
       overlap
     } as CollisionEvent);
 
-    // Separate bodies based on mass ratio
+    // Separate bodies based on mass ratio (like original demo)
     const totalMass = a.mass + b.mass;
     const aRatio = b.mass / totalMass;
     const bRatio = a.mass / totalMass;
@@ -296,11 +293,10 @@ export class World extends Body {
       b.y += ny * overlap * bRatio;
     }
 
-    // Apply restitution (bounce)
-    const restitution = Math.min(
-      a.getEffectiveRestitution(),
-      b.getEffectiveRestitution()
-    );
+    // Apply restitution (bounce) - match original demo logic
+    const restitutionA = a.restitution !== null ? a.restitution : this.restitution;
+    const restitutionB = b.restitution !== null ? b.restitution : this.restitution;
+    const restitution = Math.min(restitutionA, restitutionB);
 
     const aVx = (a.x - a.prevX) * restitution;
     const aVy = (a.y - a.prevY) * restitution;
@@ -310,12 +306,48 @@ export class World extends Body {
     if (!a.isStatic) {
       a.prevX = a.x - bVx;
       a.prevY = a.y - bVy;
-      a.sleeping = false;
     }
     if (!b.isStatic) {
       b.prevX = b.x - aVx;
       b.prevY = b.y - aVy;
-      b.sleeping = false;
+    }
+  }
+
+  /**
+   * Constrain body to world bounds (matches original demo exactly)
+   */
+  private constrainToBounds(body: Body): void {
+    if (body.isStatic || !body.enabled) return;
+    
+    const restitution = body.restitution !== null ? body.restitution : this.restitution;
+    const pos = body.getWorldPosition();
+    
+    // Bottom
+    if (pos.y + body.radius > this.bounds.height) {
+      const diff = (this.bounds.height - body.radius) - pos.y;
+      body.y += diff;
+      body.prevY = body.y + (body.y - body.prevY) * restitution;
+    }
+    
+    // Top
+    if (pos.y - body.radius < 0) {
+      const diff = body.radius - pos.y;
+      body.y += diff;
+      body.prevY = body.y - (body.y - body.prevY) * restitution;
+    }
+    
+    // Left
+    if (pos.x - body.radius < 0) {
+      const diff = body.radius - pos.x;
+      body.x += diff;
+      body.prevX = body.x - (body.x - body.prevX) * restitution;
+    }
+    
+    // Right
+    if (pos.x + body.radius > this.bounds.width) {
+      const diff = (this.bounds.width - body.radius) - pos.x;
+      body.x += diff;
+      body.prevX = body.x + (body.x - body.prevX) * restitution;
     }
   }
 

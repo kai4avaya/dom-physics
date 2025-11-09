@@ -80,27 +80,32 @@ export class Body {
     this.updateCachedWorld(); // Cache World reference for fast access
 
     // Preserve original DOM context
-    // Batch getBoundingClientRect calls to minimize reflows
-    this.originalPosition = element.getBoundingClientRect();
+    // Calculate world-space origin FIRST (before any DOM changes)
+    const rootWorld = this.findRootWorld();
+    if (rootWorld) {
+      // Get positions BEFORE modifying DOM (like original demo)
+      const worldRect = rootWorld.container.getBoundingClientRect();
+      const elemRect = element.getBoundingClientRect();
+      
+      // Calculate origin in world space (exactly like original demo)
+      this.originX = elemRect.left - worldRect.left;
+      this.originY = elemRect.top - worldRect.top;
+      
+      // Store original position
+      this.originalPosition = elemRect;
+    } else {
+      // Fallback if no World parent
+      const elemRect = element.getBoundingClientRect();
+      this.originalPosition = elemRect;
+      this.originX = elemRect.left;
+      this.originY = elemRect.top;
+    }
+    
+    // Capture parent info and styles AFTER getting positions
     this.originalParent = this.captureParentInfo();
     this.originalStyles = this.captureStyles([
       'position', 'transform', 'display', 'zIndex'
     ]);
-
-    // Calculate world-space origin (like original demo)
-    // For direct World children, this is relative to World container
-    // For nested bodies, this will be adjusted by getWorldPosition()
-    const rootWorld = this.findRootWorld();
-    if (rootWorld) {
-      // Only get world rect if we need it (avoid extra reflow)
-      const worldRect = rootWorld.container.getBoundingClientRect();
-      this.originX = this.originalPosition.left - worldRect.left;
-      this.originY = this.originalPosition.top - worldRect.top;
-    } else {
-      // Fallback if no World parent (shouldn't happen in normal use)
-      this.originX = this.originalPosition.left;
-      this.originY = this.originalPosition.top;
-    }
 
     // Initialize physics state
     this.x = config.initialVelocity?.x ?? 0;
@@ -501,18 +506,11 @@ export class Body {
 
   /**
    * Sync DOM element (ONLY modifies transform)
+   * Matches original demo exactly - simple translate, no composition
    */
   render(): void {
-    // Compose transform with original transform if it exists
-    const baseTransform = this.originalStyles.transform !== 'none' 
-      ? this.originalStyles.transform + ' ' 
-      : '';
-    
-    this.element.style.transform = 
-      `${baseTransform}translate(${this.x}px, ${this.y}px)`;
-    
-    // Children render themselves (they have their own elements)
-    // No need to compose transforms here - each Body renders its own element
+    // Simple translate like original demo (no transform composition for now)
+    this.element.style.transform = `translate(${this.x}px, ${this.y}px)`;
   }
 
   /**
