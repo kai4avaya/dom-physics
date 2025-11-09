@@ -47,12 +47,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/dom-physics.git"
+    "url": "https://github.com/kai4avaya/dom-physics.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/dom-physics/issues"
+    "url": "https://github.com/kai4avaya/dom-physics/issues"
   },
-  "homepage": "https://github.com/yourusername/dom-physics#readme",
+  "homepage": "https://kai4avaya.github.io/dom-physics/",
   "devDependencies": {
     "typescript": "^5.0.0",
     "vitest": "^1.0.0",
