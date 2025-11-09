@@ -64,7 +64,8 @@
 
   <script type="module">
     // Import from the built package
-    import { World, Body } from '../dist/index.js';
+    // Path works with local dev server (absolute) and GitHub Pages (relative via prepare script)
+    import { World, Body } from '/dist/index.js';
     
     // ============================================================================
     // DEMO

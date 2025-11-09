@@ -58,9 +58,14 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // If requesting from dist, serve from dist
+  // If requesting from dist, serve from dist (works for both demo types)
   if (req.url.startsWith('/dist/')) {
     filePath = path.join(__dirname, '..', req.url);
+  }
+  
+  // Also handle ./dist/ imports in demo-package
+  if (req.url.startsWith('/demo-package/dist/')) {
+    filePath = path.join(__dirname, '..', 'dist', req.url.replace('/demo-package/dist/', ''));
   }
 
   fs.stat(filePath, (err, stats) => {

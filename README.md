@@ -2,6 +2,8 @@
 
 A physics engine for DOM elements that preserves DOM structure while enabling physics simulation. Built with TypeScript, supports recursive nesting, independent simulation loops, and physics inheritance.
 
+🌐 **[Live Demo on GitHub Pages](https://kai4avaya.github.io/dom-physics/)** | 📦 [npm](https://www.npmjs.com/package/dom-physics)
+
 ## Features
 
 ✅ **DOM Structure Preserved** - Never modifies DOM hierarchy, only manipulates transforms  

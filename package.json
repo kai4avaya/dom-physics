@@ -28,6 +28,7 @@
     "test:coverage": "vitest run --coverage",
     "demo": "node scripts/serve-demo.js",
     "demo:package": "node scripts/serve-demo.js --package",
+    "prepare:pages": "node scripts/prepare-pages.js",
     "prepublishOnly": "npm run build && npm run test:run"
   },
   "keywords": [
