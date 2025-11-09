@@ -49,6 +49,11 @@ world.start();
 
 ## Running the Demo
 
+### Online Demo
+🌐 **[Try it live on GitHub Pages](https://kai4avaya.github.io/dom-physics/)**
+
+### Local Demo
+
 After installing the package, you can run the included demo:
 
 ```bash
@@ -65,6 +70,8 @@ npm run demo:package  # Package-based demo
 ```
 
 Then open http://localhost:3000 in your browser.
+
+See [DEMO.md](./DEMO.md) for more details.
 
 ## Testing
 
