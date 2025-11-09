@@ -1,7 +1,7 @@
 {
   "name": "dom-physics",
   "version": "0.1.0",
-  "description": "A physics engine for DOM elements that preserves DOM structure. Supports recursive nesting, independent simulation loops, and physics inheritance.",
+  "description": "A simple, performant physics engine for DOM elements. Preserves DOM structure while enabling realistic physics simulation.",
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
