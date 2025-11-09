@@ -1,14 +1,7 @@
-// Main exports
-export { Body } from './Body.js';
-export { World } from './World.js';
-export { SpatialHash } from './SpatialHash.js';
+/**
+ * dom-physics - Simple DOM physics engine
+ * Matches original demo behavior exactly
+ */
 
-// Type exports
-export type {
-  Vec2,
-  WorldConfig,
-  BodyConfig,
-  Bounds,
-  CollisionEvent,
-  ParentInfo,
-} from './types.js';
+export { Body, type BodyConfig } from './Body.js';
+export { World, type WorldConfig } from './World.js';

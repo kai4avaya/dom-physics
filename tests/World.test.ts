@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Body } from '../src/Body';
-import { World } from '../src/World';
+import { World } from '../src/World.js';
+import { Body } from '../src/Body.js';
 
 describe('World', () => {
   let container: HTMLElement;
@@ -11,251 +11,177 @@ describe('World', () => {
     container.id = 'world';
     container.style.width = '800px';
     container.style.height = '600px';
+    container.style.position = 'relative';
     document.body.appendChild(container);
+
+    // Mock getBoundingClientRect
+    container.getBoundingClientRect = () => ({
+      left: 0,
+      top: 0,
+      right: 800,
+      bottom: 600,
+      width: 800,
+      height: 600,
+      x: 0,
+      y: 0,
+      toJSON: () => {}
+    });
   });
 
   describe('constructor', () => {
-    it('should create a world with default config', () => {
+    it('should create a world with default properties', () => {
       const world = new World(container);
-
+      
       expect(world.container).toBe(container);
+      expect(world.bodies).toEqual([]);
       expect(world.gravity).toBe(980);
       expect(world.friction).toBe(0.99);
       expect(world.restitution).toBe(0.8);
-      expect(world.isWorld).toBe(true);
+      expect(world.timeStep).toBe(1/60);
+      expect(world.running).toBe(false);
     });
 
     it('should create a world with custom config', () => {
       const world = new World(container, {
         gravity: 500,
         friction: 0.95,
-        restitution: 0.7,
+        restitution: 0.5,
+        timeStep: 1/30,
       });
-
+      
       expect(world.gravity).toBe(500);
       expect(world.friction).toBe(0.95);
-      expect(world.restitution).toBe(0.7);
+      expect(world.restitution).toBe(0.5);
+      expect(world.timeStep).toBe(1/30);
     });
 
     it('should auto-detect bounds from container', () => {
-      // Mock getBoundingClientRect for jsdom
-      const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
-      Element.prototype.getBoundingClientRect = function() {
-        if (this === container) {
-          return {
-            width: 800,
-            height: 600,
-            top: 0,
-            left: 0,
-            right: 800,
-            bottom: 600,
-          } as DOMRect;
-        }
-        return originalGetBoundingClientRect.call(this);
-      };
-
       const world = new World(container);
-
-      expect(world.bounds).toBeTruthy();
-      expect(world.bounds!.width).toBe(800);
-      expect(world.bounds!.height).toBe(600);
-
-      // Restore
-      Element.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+      expect(world.bounds.width).toBe(800);
+      expect(world.bounds.height).toBe(600);
+      expect(world.bounds.x).toBe(0);
+      expect(world.bounds.y).toBe(0);
     });
 
-    it('should use custom bounds when provided', () => {
+    it('should use custom bounds if provided', () => {
       const world = new World(container, {
-        bounds: { x: 0, y: 0, width: 400, height: 300 },
+        bounds: { x: 10, y: 20, width: 100, height: 200 }
       });
-
-      expect(world.bounds!.width).toBe(400);
-      expect(world.bounds!.height).toBe(300);
+      expect(world.bounds.width).toBe(100);
+      expect(world.bounds.height).toBe(200);
+      expect(world.bounds.x).toBe(10);
+      expect(world.bounds.y).toBe(20);
     });
   });
 
-  describe('body management', () => {
+  describe('registerBody', () => {
     it('should register a body', () => {
       const world = new World(container);
       const element = document.createElement('div');
       container.appendChild(element);
+      element.getBoundingClientRect = () => ({
+        left: 100, top: 100, right: 150, bottom: 150,
+        width: 50, height: 50, x: 100, y: 100, toJSON: () => {}
+      });
+      
       const body = new Body(element, world);
-
       world.registerBody(body);
-
-      // Check via getBodiesByParent (indirect check)
-      const bodies = world.getBodiesByParent(container);
-      expect(bodies.length).toBeGreaterThan(0);
+      
+      expect(world.bodies).toContain(body);
+      expect(world.bodies.length).toBe(1);
     });
 
     it('should not register duplicate bodies', () => {
       const world = new World(container);
       const element = document.createElement('div');
       container.appendChild(element);
+      element.getBoundingClientRect = () => ({
+        left: 100, top: 100, right: 150, bottom: 150,
+        width: 50, height: 50, x: 100, y: 100, toJSON: () => {}
+      });
+      
       const body = new Body(element, world);
-
       world.registerBody(body);
       world.registerBody(body);
-
-      // Should only be registered once
-      const bodies = world.getBodiesByParent(container);
-      expect(bodies.length).toBe(1);
+      
+      expect(world.bodies.length).toBe(1);
     });
+  });
 
+  describe('unregisterBody', () => {
     it('should unregister a body', () => {
       const world = new World(container);
       const element = document.createElement('div');
       container.appendChild(element);
+      element.getBoundingClientRect = () => ({
+        left: 100, top: 100, right: 150, bottom: 150,
+        width: 50, height: 50, x: 100, y: 100, toJSON: () => {}
+      });
+      
       const body = new Body(element, world);
-
       world.registerBody(body);
       world.unregisterBody(body);
-
-      const bodies = world.getBodiesByParent(container);
-      expect(bodies.length).toBe(0);
+      
+      expect(world.bodies).not.toContain(body);
+      expect(world.bodies.length).toBe(0);
     });
   });
 
-  describe('simulation control', () => {
+  describe('start/stop', () => {
     it('should start simulation', () => {
       const world = new World(container);
+      world.start();
       
-      world.start();
-
-      expect(world['running']).toBe(true);
-    });
-
-    it('should stop simulation', () => {
-      const world = new World(container);
-      world.start();
+      expect(world.running).toBe(true);
       
       world.stop();
-
-      expect(world['running']).toBe(false);
+      expect(world.running).toBe(false);
     });
 
     it('should not start if already running', () => {
       const world = new World(container);
       world.start();
-      const rafId = world['rafId'];
+      const initialTime = world.lastTime;
       
-      world.start();
-
-      // Should not create new animation frame
-      expect(world['rafId']).toBe(rafId);
+      // Wait a bit
+      vi.useFakeTimers();
+      vi.advanceTimersByTime(100);
+      
+      world.start(); // Should not restart
+      expect(world.lastTime).toBe(initialTime);
+      
+      vi.useRealTimers();
+      world.stop();
     });
   });
 
-  describe('physics inheritance', () => {
-    it('should always return its own physics values', () => {
-      const world = new World(container, {
-        gravity: 500,
-        friction: 0.95,
-        restitution: 0.7,
-      });
-
-      expect(world.getEffectiveGravity()).toBe(500);
-      expect(world.getEffectiveFriction()).toBe(0.95);
-      expect(world.getEffectiveRestitution()).toBe(0.7);
-    });
-  });
-
-  describe('nested worlds', () => {
-    it('should stop nested worlds when stopped', () => {
-      const outerWorld = new World(container);
-      const innerContainer = document.createElement('div');
-      container.appendChild(innerContainer);
-      const innerWorld = new World(innerContainer);
-
-      outerWorld.addBody(innerWorld);
-      innerWorld.start();
-      outerWorld.start();
-
-      outerWorld.stop();
-
-      expect(innerWorld['running']).toBe(false);
-    });
-  });
-
-  describe('queries', () => {
-    it('should get bodies by parent element', () => {
-      const world = new World(container);
-      const parent = document.createElement('div');
-      container.appendChild(parent);
-
-      const element1 = document.createElement('div');
-      const element2 = document.createElement('div');
-      parent.appendChild(element1);
-      parent.appendChild(element2);
-
-      const body1 = new Body(element1, world);
-      const body2 = new Body(element2, world);
-      world.registerBody(body1);
-      world.registerBody(body2);
-
-      const bodies = world.getBodiesByParent(parent);
-      expect(bodies.length).toBe(2);
-      expect(bodies).toContain(body1);
-      expect(bodies).toContain(body2);
-    });
-
-    it('should get escaped bodies', () => {
-      const world = new World(container);
-      const parent = document.createElement('div');
-      parent.style.width = '100px';
-      parent.style.height = '100px';
-      container.appendChild(parent);
-
-      const element = document.createElement('div');
-      parent.appendChild(element);
-      const body = new Body(element, world);
-      world.registerBody(body);
-
-      // Move body outside parent bounds
-      body.x = 200;
-      body.y = 200;
-
-      const escaped = world.getEscapedBodies();
-      expect(escaped).toContain(body);
-    });
-  });
-
-  describe('reset and destroy', () => {
-    it('should reset all bodies', () => {
+  describe('step', () => {
+    it('should integrate bodies', () => {
       const world = new World(container);
       const element1 = document.createElement('div');
       const element2 = document.createElement('div');
       container.appendChild(element1);
       container.appendChild(element2);
-
+      
+      element1.getBoundingClientRect = () => ({
+        left: 100, top: 100, right: 150, bottom: 150,
+        width: 50, height: 50, x: 100, y: 100, toJSON: () => {}
+      });
+      element2.getBoundingClientRect = () => ({
+        left: 200, top: 200, right: 250, bottom: 250,
+        width: 50, height: 50, x: 200, y: 200, toJSON: () => {}
+      });
+      
       const body1 = new Body(element1, world);
       const body2 = new Body(element2, world);
       world.registerBody(body1);
       world.registerBody(body2);
-
-      body1.x = 100;
-      body2.x = 200;
-
-      world.reset();
-
-      expect(body1.x).toBe(0);
-      expect(body2.x).toBe(0);
-    });
-
-    it('should destroy and restore DOM', () => {
-      const world = new World(container);
-      const element = document.createElement('div');
-      container.appendChild(element);
-      const body = new Body(element, world);
-      world.registerBody(body);
-
-      body.x = 100;
-      body.render();
-
-      world.destroy();
-
-      expect(world['running']).toBe(false);
-      expect(element.style.transform).not.toContain('translate');
+      
+      // Step should integrate and check collisions
+      world['step']();
+      
+      // Bodies should have been integrated (gravity applied)
+      expect(body1.ay).toBe(0); // Acceleration reset after integrate
     });
   });
 });
