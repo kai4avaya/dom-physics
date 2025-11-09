@@ -77,25 +77,34 @@
       initialized = true;
       
       const text = textElement.innerHTML;
-      const wrapped = text.split('').map(char => {
+      let wrapped = '';
+      let i = 0;
+      
+      while (i < text.length) {
+        const char = text[i];
+        
         if (char === '<') {
+          // Extract the entire tag
           let tag = '';
-          let i = 0;
-          while (text[text.indexOf(char) + i] !== '>' && i < 10) {
-            tag += text[text.indexOf(char) + i];
+          while (i < text.length && text[i] !== '>') {
+            tag += text[i];
             i++;
           }
-          tag += '>';
-          return tag;
+          if (i < text.length) {
+            tag += text[i]; // Include the '>'
+            i++;
+          }
+          wrapped += tag;
+        } else if (char === ' ') {
+          wrapped += '<span class="space"> </span>';
+          i++;
+        } else if (char === '\n') {
+          i++;
+        } else {
+          wrapped += `<span>${char}</span>`;
+          i++;
         }
-        if (char === ' ') {
-          return '<span class="space"> </span>';
-        }
-        if (char === '\n') {
-          return '';
-        }
-        return `<span>${char}</span>`;
-      }).join('');
+      }
       
       textElement.innerHTML = wrapped;
       

@@ -29,7 +29,7 @@ function serveFile(filePath, res) {
   fs.readFile(filePath, (err, data) => {
     if (err) {
       res.writeHead(404);
-      res.end('File not found');
+      res.end('File not found: ' + err.message);
       return;
     }
 
@@ -45,7 +45,34 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  let filePath = path.join(__dirname, '..', DEMO_DIR, req.url === '/' ? 'index.html' : req.url);
+  let url = req.url;
+  
+  // Handle root - serve index.html
+  if (url === '/' || url === '/demo-package' || url === '/demo-package/') {
+    url = '/index.html';
+  }
+  
+  // Remove leading slash for path joining
+  if (url.startsWith('/')) {
+    url = url.slice(1);
+  }
+  
+  // Handle dist imports (absolute paths in demos)
+  if (url.startsWith('dist/')) {
+    const filePath = path.join(__dirname, '..', url);
+    fs.stat(filePath, (err, stats) => {
+      if (err || !stats.isFile()) {
+        res.writeHead(404);
+        res.end('File not found: ' + url);
+        return;
+      }
+      serveFile(filePath, res);
+    });
+    return;
+  }
+  
+  // Serve from demo directory
+  let filePath = path.join(__dirname, '..', DEMO_DIR, url);
 
   // Security: prevent directory traversal
   const resolvedPath = path.resolve(filePath);
@@ -58,20 +85,10 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // If requesting from dist, serve from dist (works for both demo types)
-  if (req.url.startsWith('/dist/')) {
-    filePath = path.join(__dirname, '..', req.url);
-  }
-  
-  // Also handle ./dist/ imports in demo-package
-  if (req.url.startsWith('/demo-package/dist/')) {
-    filePath = path.join(__dirname, '..', 'dist', req.url.replace('/demo-package/dist/', ''));
-  }
-
   fs.stat(filePath, (err, stats) => {
     if (err || !stats.isFile()) {
       res.writeHead(404);
-      res.end('File not found');
+      res.end('File not found: ' + url);
       return;
     }
 
@@ -84,5 +101,13 @@ server.listen(PORT, () => {
   console.log(`\n🚀 DOM Physics Demo Server`);
   console.log(`📦 Demo type: ${demoType}`);
   console.log(`🌐 Server running at http://localhost:${PORT}`);
+  if (usePackage) {
+    console.log(`\n📝 Available demos:`);
+    console.log(`   - http://localhost:${PORT}/demo-text.html`);
+    console.log(`   - http://localhost:${PORT}/demo-squares.html`);
+    console.log(`   - http://localhost:${PORT}/demo-bouncing.html`);
+    console.log(`   - http://localhost:${PORT}/demo-stack.html`);
+    console.log(`   - http://localhost:${PORT}/ (landing page)`);
+  }
   console.log(`\nPress Ctrl+C to stop\n`);
 });
