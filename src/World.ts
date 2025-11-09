@@ -194,8 +194,34 @@ export class World extends Body {
   /**
    * Collision detection with spatial hashing
    * Worlds can collide with Bodies!
+   * Optimized: Uses simple O(n²) for small body counts (< 50)
    */
   private detectAndResolveCollisions(): void {
+    const bodyCount = this.simulationBodies.length;
+    
+    // For small numbers, simple O(n²) is faster than spatial hash overhead
+    if (bodyCount < 50) {
+      for (let i = 0; i < bodyCount; i++) {
+        const bodyA = this.simulationBodies[i];
+        if (!bodyA.enabled) continue;
+        
+        for (let j = i + 1; j < bodyCount; j++) {
+          const bodyB = this.simulationBodies[j];
+          if (!bodyB.enabled) continue;
+          
+          // Check collision group filtering
+          if (!(bodyA.collisionGroup & bodyB.collidesWith) ||
+              !(bodyB.collisionGroup & bodyA.collidesWith)) {
+            continue;
+          }
+          
+          this.resolveCollision(bodyA, bodyB);
+        }
+      }
+      return;
+    }
+    
+    // Use spatial hash for larger body counts
     if (!this.spatialHash) return;
 
     this.spatialHash.clear();

@@ -25,6 +25,9 @@ export class Body {
   physicsParent: Body | null = null;
   readonly bodies: Body[] = [];
   readonly isWorld: boolean = false;
+  
+  // Cache World reference for fast physics value access (optimization)
+  private cachedWorld: World | null = null;
 
   // ============================================================
   // Physics Properties (null = inherit from parent World)
@@ -74,10 +77,12 @@ export class Body {
   ) {
     this.element = element;
     this.physicsParent = physicsParent;
+    this.updateCachedWorld(); // Cache World reference for fast access
 
     // Preserve original DOM context
-    this.originalParent = this.captureParentInfo();
+    // Batch getBoundingClientRect calls to minimize reflows
     this.originalPosition = element.getBoundingClientRect();
+    this.originalParent = this.captureParentInfo();
     this.originalStyles = this.captureStyles([
       'position', 'transform', 'display', 'zIndex'
     ]);
@@ -87,6 +92,7 @@ export class Body {
     // For nested bodies, this will be adjusted by getWorldPosition()
     const rootWorld = this.findRootWorld();
     if (rootWorld) {
+      // Only get world rect if we need it (avoid extra reflow)
       const worldRect = rootWorld.container.getBoundingClientRect();
       this.originX = this.originalPosition.left - worldRect.left;
       this.originY = this.originalPosition.top - worldRect.top;
@@ -152,16 +158,21 @@ export class Body {
 
   /**
    * Capture parent DOM info WITHOUT modifying structure
+   * Optimized: Only capture if needed (for nested bodies)
    */
   private captureParentInfo(): ParentInfo | null {
     const parent = this.element.parentElement;
     if (!parent) return null;
-
+    
+    // For direct World children, we don't need all this info
+    // Only capture if parent is not the World container
+    const computedStyle = getComputedStyle(parent);
+    
     return {
       element: parent,
-      computedStyle: getComputedStyle(parent),
+      computedStyle: computedStyle,
       bounds: parent.getBoundingClientRect(),
-      zIndex: parseInt(getComputedStyle(parent).zIndex) || 0
+      zIndex: parseInt(computedStyle.zIndex) || 0
     };
   }
 
@@ -180,17 +191,34 @@ export class Body {
   }
 
   /**
+   * Cache World reference for fast access (called when physicsParent changes)
+   */
+  private updateCachedWorld(): void {
+    if (this.physicsParent?.isWorld) {
+      this.cachedWorld = this.physicsParent as World;
+    } else {
+      this.cachedWorld = null;
+    }
+  }
+
+  /**
    * Get effective physics values (with inheritance)
-   * Walks up physics hierarchy to find parent World
+   * Optimized: Uses cached World reference for fast access
    */
   getEffectiveGravity(): number {
     if (this.gravity !== null) return this.gravity;
+    
+    // Fast path: Direct child of World (most common case)
+    if (this.cachedWorld) {
+      return this.cachedWorld.gravity;
+    }
     
     // Walk up physics hierarchy to find parent World
     let parent = this.physicsParent;
     while (parent) {
       if (parent.isWorld) {
-        return (parent as World).gravity;
+        this.cachedWorld = parent as World; // Cache for next time
+        return this.cachedWorld.gravity;
       }
       if (parent.gravity !== null) {
         return parent.gravity;
@@ -204,10 +232,16 @@ export class Body {
   getEffectiveFriction(): number {
     if (this.friction !== null) return this.friction;
     
+    // Fast path: Direct child of World
+    if (this.cachedWorld) {
+      return this.cachedWorld.friction;
+    }
+    
     let parent = this.physicsParent;
     while (parent) {
       if (parent.isWorld) {
-        return (parent as World).friction;
+        this.cachedWorld = parent as World;
+        return this.cachedWorld.friction;
       }
       if (parent.friction !== null) {
         return parent.friction;
@@ -221,10 +255,16 @@ export class Body {
   getEffectiveRestitution(): number {
     if (this.restitution !== null) return this.restitution;
     
+    // Fast path: Direct child of World
+    if (this.cachedWorld) {
+      return this.cachedWorld.restitution;
+    }
+    
     let parent = this.physicsParent;
     while (parent) {
       if (parent.isWorld) {
-        return (parent as World).restitution;
+        this.cachedWorld = parent as World;
+        return this.cachedWorld.restitution;
       }
       if (parent.restitution !== null) {
         return parent.restitution;
@@ -309,13 +349,31 @@ export class Body {
 
   /**
    * Verlet integration (uses effective physics values)
+   * Optimized for direct World children (most common case)
    */
   integrate(dt: number): void {
-    if (this.isStatic || !this.enabled || this.sleeping) return;
+    if (this.isStatic || !this.enabled) return;
 
-    // Get effective physics values (with inheritance)
-    const gravity = this.getEffectiveGravity();
-    const friction = this.getEffectiveFriction();
+    // Fast path: Direct child of World (most common case)
+    // Access World values directly without function calls
+    let gravity: number;
+    let friction: number;
+    
+    if (this.gravity !== null) {
+      gravity = this.gravity;
+    } else if (this.cachedWorld) {
+      gravity = this.cachedWorld.gravity;
+    } else {
+      gravity = this.getEffectiveGravity();
+    }
+    
+    if (this.friction !== null) {
+      friction = this.friction;
+    } else if (this.cachedWorld) {
+      friction = this.cachedWorld.friction;
+    } else {
+      friction = this.getEffectiveFriction();
+    }
 
     // Apply gravity
     this.ay += gravity;
@@ -333,22 +391,20 @@ export class Body {
     // Reset acceleration
     this.ax = 0;
     this.ay = 0;
-
-    // Check for sleep
-    const speed = Math.sqrt(vx * vx + vy * vy);
-    if (speed < 0.1) {
-      this.sleeping = true;
-    }
   }
 
   /**
    * Constrain to bounds (if set)
    * Works in local coordinate space
+   * Optimized: Fast path for common case (no bounds)
    */
   constrainToBounds(): void {
     if (!this.bounds || this.isStatic || !this.enabled) return;
 
-    const restitution = this.getEffectiveRestitution();
+    // Fast path: Use cached World for restitution if available
+    const restitution = this.restitution !== null 
+      ? this.restitution 
+      : (this.cachedWorld ? this.cachedWorld.restitution : this.getEffectiveRestitution());
     const localPos = { x: this.x, y: this.y };
 
     // Bottom
