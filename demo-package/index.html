@@ -47,6 +47,34 @@
     .physics-active .text span {
       position: relative;
     }
+    
+    .attribution {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      text-align: right;
+      font-family: Georgia, serif;
+      font-size: 14px;
+      color: #2c3e50;
+      line-height: 1.6;
+      z-index: 1000;
+    }
+    
+    .attribution .poem-title {
+      font-style: italic;
+      margin-bottom: 4px;
+    }
+    
+    .attribution .author-name a {
+      color: #2c3e50;
+      text-decoration: none;
+      border-bottom: 1px solid #2c3e50;
+    }
+    
+    .attribution .author-name a:hover {
+      color: #3498db;
+      border-bottom-color: #3498db;
+    }
   </style>
 </head>
 <body>
@@ -158,5 +186,12 @@
       });
     });
   </script>
+  
+  <div class="attribution">
+    <div class="poem-title">The Road Not Taken</div>
+    <div class="author-name">
+      <a href="https://en.wikipedia.org/wiki/Robert_Frost" target="_blank" rel="noopener noreferrer">Robert Frost</a>
+    </div>
+  </div>
 </body>
 </html>

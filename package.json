@@ -2,6 +2,15 @@
   "name": "dom-physics",
   "version": "0.1.0",
   "description": "A simple, performant physics engine for DOM elements. Preserves DOM structure while enabling realistic physics simulation.",
+  "keywords": [
+    "physics",
+    "dom",
+    "animation",
+    "simulation",
+    "collision",
+    "gravity",
+    "interactive"
+  ],
   "main": "dist/index.js",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",

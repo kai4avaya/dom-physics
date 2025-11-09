@@ -17,7 +17,7 @@ A simple, performant physics engine for DOM elements. Preserves DOM structure wh
 The previous version had advanced features like:
 - World extending Body (nesting)
 - Physics inheritance with recursive lookups
-- SpatialHash optimization
+- SpatialHash optimization (removed - not needed for typical use cases)
 - Complex coordinate transformations
 
 **Why we simplified:**
@@ -70,23 +70,61 @@ world.start();
 
 ## Demos
 
-🌐 **[Try all demos live](https://kai4avaya.github.io/dom-physics/)**
+🌐 **[Try all demos live on GitHub Pages](https://kai4avaya.github.io/dom-physics/)**
 
-- **Text Demo** - Interactive text that responds to mouse movement
-- **Squares Demo** - Click to add squares, hover to push them around
-- **Bouncing Balls** - Colorful balls bouncing in a circular container
-- **Stack Demo** - Build towers by clicking, watch blocks stack
+### Main Demo (Published Demo)
+**Text Demo** (`demo-text.html`) - Interactive text that responds to mouse movement. This is the main published demo showcasing the package.
+
+### Additional Demos
+- **Squares Demo** (`demo-squares.html`) - Click to add squares, hover to push them around. Demonstrates collision detection and bounds.
+- **Bouncing Balls** (`demo-bouncing.html`) - Colorful balls bouncing in a circular container. Shows high restitution physics.
+- **Stack Demo** (`demo-stack.html`) - Build towers by clicking. Watch blocks stack and balance with realistic physics.
 
 ### Running Demos Locally
 
+#### Option 1: Using npm (if installed as package)
 ```bash
 # Install the package
 npm install dom-physics
 
-# Run demos (if developing the package)
+# Navigate to package directory
+cd node_modules/dom-physics
+
+# Run the demo server
 npm run demo:package
 
-# Then open http://localhost:3000/demo-package/
+# Open http://localhost:3000/demo-package/ in your browser
+# Navigate to specific demos:
+# - http://localhost:3000/demo-package/demo-text.html (main demo)
+# - http://localhost:3000/demo-package/demo-squares.html
+# - http://localhost:3000/demo-package/demo-bouncing.html
+# - http://localhost:3000/demo-package/demo-stack.html
+```
+
+#### Option 2: From Source (if developing)
+```bash
+# Clone the repository
+git clone https://github.com/kai4avaya/dom-physics.git
+cd dom-physics
+
+# Install dependencies
+npm install
+
+# Build the package
+npm run build
+
+# Run the demo server
+npm run demo:package
+
+# Open http://localhost:3000/demo-package/ in your browser
+```
+
+#### Option 3: Original Inline Demo
+```bash
+# Run the original inline demo (for comparison)
+npm run demo
+
+# Open http://localhost:3000/ in your browser
 ```
 
 ## API Reference
