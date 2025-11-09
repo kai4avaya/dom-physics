@@ -21,14 +21,18 @@
       background: #f5f5f5;
       font-family: Georgia, serif;
       overflow: hidden;
+    }
+    
+    .wrapper {
       position: relative;
+      width: 800px;
+      margin: 40px auto;
     }
     
     #world {
       position: relative;
       width: 800px;
       height: 600px;
-      margin: 40px auto;
       background: #ffffff;
       border: 2px solid #333;
     }
@@ -54,10 +58,16 @@
       position: relative;
     }
     
+    .wrapper {
+      position: relative;
+      width: 800px;
+      margin: 40px auto;
+    }
+    
     .attribution {
       position: absolute;
-      bottom: 20px;
-      right: calc(50% - 400px + 10px);
+      bottom: -25px;
+      right: 10px;
       font-size: 11px;
       color: #666;
       text-align: right;
@@ -74,20 +84,22 @@
   </style>
 </head>
 <body>
-  <div id="world">
-    <div class="container">
-      <div class="text">
-        Two roads diverged in a yellow wood,<br>
-        And sorry I could not travel both<br>
-        And be one traveler, long I stood<br>
-        And looked down one as far as I could<br>
-        To where it bent in the undergrowth;
+  <div class="wrapper">
+    <div id="world">
+      <div class="container">
+        <div class="text">
+          Two roads diverged in a yellow wood,<br>
+          And sorry I could not travel both<br>
+          And be one traveler, long I stood<br>
+          And looked down one as far as I could<br>
+          To where it bent in the undergrowth;
+        </div>
       </div>
     </div>
-  </div>
-  <div class="attribution">
-    "<a href="https://kai4avaya.github.io/dom-physics/demo-text.html">The Road Not Taken</a>"<br>
-    by <a href="https://en.wikipedia.org/wiki/Robert_Frost" target="_blank">Robert Frost</a>
+    <div class="attribution">
+      "<a href="https://kai4avaya.github.io/dom-physics/demo-text.html">The Road Not Taken</a>"<br>
+      by <a href="https://en.wikipedia.org/wiki/Robert_Frost" target="_blank">Robert Frost</a>
+    </div>
   </div>
 
   <script type="module">
