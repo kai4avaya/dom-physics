@@ -1,6 +1,6 @@
 {
   "name": "dom-physics",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "A simple, performant physics engine for DOM elements. Preserves DOM structure while enabling realistic physics simulation.",
   "keywords": [
     "physics",
