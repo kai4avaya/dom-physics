@@ -109,6 +109,9 @@ export class World {
   };
   
   private step(): void {
+    // Apply gravity to all bodies (like Matter.js)
+    this._bodiesApplyGravity();
+    
     // Integrate
     for (const body of this.bodies) {
       body.integrate(this.timeStep, this);
@@ -127,7 +130,27 @@ export class World {
     }
   }
   
+  /**
+   * Applies gravitational force to all bodies (Matter.js exact style)
+   * Matter.js: body.force.y += body.mass * gravity.y * gravityScale
+   * We use: body.fy += body.mass * gravity (since our gravity is already scaled)
+   */
+  private _bodiesApplyGravity(): void {
+    if (this.gravity === 0) return;
+    
+    for (const body of this.bodies) {
+      if (body.isStatic || !body.enabled || body.isDragged) continue;
+      
+      // Matter.js exact formula: body.force.y += body.mass * gravity.y * gravityScale
+      // Since our gravity is a single value (y direction), we apply it as:
+      body.fy += body.mass * this.gravity;
+    }
+  }
+  
   private resolveCollision(a: Body, b: Body): void {
+    // Skip collision resolution if either body is being dragged
+    if (a.isDragged || b.isDragged) return;
+    
     const posA = a.getWorldPosition();
     const posB = b.getWorldPosition();
     
@@ -142,17 +165,45 @@ export class World {
     const ny = dy / dist;
     const overlap = minDist - dist;
     
+    // Don't use separation factor - it causes floating
+    // Just resolve the overlap directly
     const totalMass = a.mass + b.mass;
     const aRatio = b.mass / totalMass;
     const bRatio = a.mass / totalMass;
     
-    if (!a.isStatic) {
-      a.x -= nx * overlap * aRatio;
-      a.y -= ny * overlap * aRatio;
+    // Prevent excessive upward movement - if collision normal points up significantly,
+    // reduce the vertical component to prevent floating
+    let adjustedNY = ny;
+    if (ny < -0.3) { // Collision normal pointing upward
+      // Reduce upward push - prefer horizontal separation
+      adjustedNY = ny * 0.3; // Dampen upward component
     }
-    if (!b.isStatic) {
+    
+    if (!a.isStatic && !a.isDragged) {
+      a.x -= nx * overlap * aRatio;
+      a.y -= adjustedNY * overlap * aRatio;
+    }
+    if (!b.isStatic && !b.isDragged) {
       b.x += nx * overlap * bRatio;
-      b.y += ny * overlap * bRatio;
+      b.y += adjustedNY * overlap * bRatio;
+    }
+    
+    // Calculate relative velocity along collision normal
+    const aVx = (a.x - a.prevX);
+    const aVy = (a.y - a.prevY);
+    const bVx = (b.x - b.prevX);
+    const bVy = (b.y - b.prevY);
+    const relVx = bVx - aVx;
+    const relVy = bVy - aVy;
+    const relVelAlongNormal = relVx * nx + relVy * ny;
+    
+    // Only apply restitution if bodies are moving towards each other
+    // and relative velocity is significant (prevents micro-bounces)
+    const minRelativeVelocity = 0.5; // pixels per frame
+    if (relVelAlongNormal > -minRelativeVelocity) {
+      // Bodies are separating or moving slowly - don't add energy
+      // Just resolve overlap without bounce
+      return;
     }
     
     const restitution = Math.min(
@@ -160,23 +211,27 @@ export class World {
       b.restitution !== null ? b.restitution : this.restitution
     );
     
-    const aVx = (a.x - a.prevX) * restitution;
-    const aVy = (a.y - a.prevY) * restitution;
-    const bVx = (b.x - b.prevX) * restitution;
-    const bVy = (b.y - b.prevY) * restitution;
+    // Apply restitution with damping for small velocities
+    const velocityDamping = Math.min(1.0, Math.abs(relVelAlongNormal) / 10.0);
+    const effectiveRestitution = restitution * velocityDamping;
     
-    if (!a.isStatic) {
-      a.prevX = a.x - bVx;
-      a.prevY = a.y - bVy;
+    const aVxBounce = aVx * effectiveRestitution;
+    const aVyBounce = aVy * effectiveRestitution;
+    const bVxBounce = bVx * effectiveRestitution;
+    const bVyBounce = bVy * effectiveRestitution;
+    
+    if (!a.isStatic && !a.isDragged) {
+      a.prevX = a.x - bVxBounce;
+      a.prevY = a.y - bVyBounce;
     }
-    if (!b.isStatic) {
-      b.prevX = b.x - aVx;
-      b.prevY = b.y - aVy;
+    if (!b.isStatic && !b.isDragged) {
+      b.prevX = b.x - aVxBounce;
+      b.prevY = b.y - aVyBounce;
     }
   }
   
   private constrainToBounds(body: Body): void {
-    if (body.isStatic || !body.enabled) return;
+    if (body.isStatic || !body.enabled || body.isDragged) return;
     
     const restitution = body.restitution !== null ? body.restitution : this.restitution;
     const pos = body.getWorldPosition();

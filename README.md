@@ -93,12 +93,12 @@ cd node_modules/dom-physics
 # Run the demo server
 npm run demo:package
 
-# Open http://localhost:3000/demo-package/ in your browser
+# Open http://localhost:8087/demo-package/ in your browser
 # Navigate to specific demos:
-# - http://localhost:3000/demo-package/demo-text.html (main demo)
-# - http://localhost:3000/demo-package/demo-squares.html
-# - http://localhost:3000/demo-package/demo-bouncing.html
-# - http://localhost:3000/demo-package/demo-stack.html
+# - http://localhost:8087/demo-package/demo-text.html (main demo)
+# - http://localhost:8087/demo-package/demo-squares.html
+# - http://localhost:8087/demo-package/demo-bouncing.html
+# - http://localhost:8087/demo-package/demo-stack.html
 ```
 
 #### Option 2: From Source (if developing)
@@ -116,7 +116,7 @@ npm run build
 # Run the demo server
 npm run demo:package
 
-# Open http://localhost:3000/demo-package/ in your browser
+# Open http://localhost:8087/demo-package/ in your browser
 ```
 
 #### Option 3: Original Inline Demo
@@ -124,7 +124,7 @@ npm run demo:package
 # Run the original inline demo (for comparison)
 npm run demo
 
-# Open http://localhost:3000/ in your browser
+# Open http://localhost:8087/ in your browser
 ```
 
 ## API Reference

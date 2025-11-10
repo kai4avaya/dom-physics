@@ -181,7 +181,7 @@ describe('World', () => {
       world['step']();
       
       // Bodies should have been integrated (gravity applied)
-      expect(body1.ay).toBe(0); // Acceleration reset after integrate
+      expect(body1.fy).toBe(0); // Forces reset after integrate
     });
   });
 });

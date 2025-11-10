@@ -7,7 +7,7 @@ const path = require('path');
 const args = process.argv.slice(2);
 const usePackage = args.includes('--package');
 
-const PORT = 3000;
+const PORT = 8087;
 const DEMO_DIR = usePackage ? 'demo-package' : 'demo';
 
 function getMimeType(filePath) {

@@ -64,13 +64,18 @@
     const worldElement = document.getElementById('world');
     const world = new World(worldElement, {
       gravity: 300,
-      friction: 0.98,
-      restitution: 0.7
+      friction: 0.97, // Slightly more friction to help settle
+      restitution: 0.4 // Lower restitution to reduce bouncing
     });
     
     const bodies = [];
     let draggedBody = null;
     let isDragging = false;
+    let dragStartTime = null;
+    let wasDragging = false; // Flag to prevent click after drag
+    let lastDragX = null; // Track last drag position for velocity calculation
+    let lastDragY = null;
+    let dragVelocities = []; // Store recent velocities for smoothing
     
     // Create initial squares
     function createSquare(x, y) {
@@ -83,7 +88,7 @@
       const body = new Body(square, world, {
         mass: 1,
         radius: 15,
-        restitution: 0.7
+        restitution: 0.4 // Lower restitution to reduce bouncing
       });
       
       world.registerBody(body);
@@ -111,7 +116,7 @@
       let closestBody = null;
       let minDist = Infinity;
       
-      bodies.forEach(body => {
+      bodies.forEach((body) => {
         const pos = body.getWorldPosition();
         const dx = pos.x - mx;
         const dy = pos.y - my;
@@ -126,6 +131,16 @@
       if (closestBody) {
         draggedBody = closestBody;
         isDragging = true;
+        dragStartTime = Date.now();
+        draggedBody.isDragged = true;
+        
+        // Initialize drag tracking
+        const rect = worldElement.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        lastDragX = mx - draggedBody.originX;
+        lastDragY = my - draggedBody.originY;
+        dragVelocities = [];
       }
     });
     
@@ -135,22 +150,88 @@
         const mx = e.clientX - rect.left;
         const my = e.clientY - rect.top;
         
-        const pos = draggedBody.getWorldPosition();
-        const dx = mx - pos.x;
-        const dy = my - pos.y;
+        // Directly set position to follow mouse
+        const targetX = mx - draggedBody.originX;
+        const targetY = my - draggedBody.originY;
         
-        // Apply force to drag
-        draggedBody.applyForce(dx * 10, dy * 10);
+        // Calculate drag velocity (position change per frame)
+        if (lastDragX !== null && lastDragY !== null) {
+          const vx = targetX - lastDragX;
+          const vy = targetY - lastDragY;
+          
+          // Store velocity for momentum calculation (keep last 5 frames)
+          dragVelocities.push({ vx, vy });
+          if (dragVelocities.length > 5) {
+            dragVelocities.shift();
+          }
+        }
+        
+        draggedBody.x = targetX;
+        draggedBody.y = targetY;
+        draggedBody.prevX = targetX;
+        draggedBody.prevY = targetY;
+        
+        // Update last drag position
+        lastDragX = targetX;
+        lastDragY = targetY;
+        
+        // Render immediately to show the dragged body
+        draggedBody.render();
       }
     });
     
-    worldElement.addEventListener('mouseup', () => {
+    worldElement.addEventListener('mouseup', (e) => {
+      if (isDragging && draggedBody) {
+        // Calculate average velocity from recent drag movements for flinging
+        let avgVx = 0;
+        let avgVy = 0;
+        if (dragVelocities.length > 0) {
+          // Use weighted average (more recent movements have more weight)
+          let totalWeight = 0;
+          dragVelocities.forEach((vel, index) => {
+            const weight = index + 1; // More recent = higher weight
+            avgVx += vel.vx * weight;
+            avgVy += vel.vy * weight;
+            totalWeight += weight;
+          });
+          avgVx /= totalWeight;
+          avgVy /= totalWeight;
+          
+          // Apply momentum: set prevX/prevY to create velocity in drag direction
+          // In Verlet: velocity = (x - prevX), so prevX = x - velocity
+          // Use moderate scale to allow flinging while still letting gravity accelerate
+          const momentumScale = 0.8; // Moderate momentum for flinging
+          draggedBody.prevX = draggedBody.x - avgVx * momentumScale;
+          draggedBody.prevY = draggedBody.y - avgVy * momentumScale;
+        } else {
+          // No velocity tracked, release with zero initial velocity
+          draggedBody.prevX = draggedBody.x;
+          draggedBody.prevY = draggedBody.y;
+        }
+        
+        draggedBody.isDragged = false;
+        wasDragging = true;
+        // Clear the flag after a short delay to prevent click event
+        setTimeout(() => {
+          wasDragging = false;
+        }, 100);
+      }
       isDragging = false;
       draggedBody = null;
+      dragStartTime = null;
+      lastDragX = null;
+      lastDragY = null;
+      dragVelocities = [];
     });
     
-    // Click to add squares
+    // Click to add squares - use a flag to prevent click after drag
     worldElement.addEventListener('click', (e) => {
+      // Prevent click from firing immediately after drag ends
+      if (wasDragging) {
+        wasDragging = false;
+        return;
+      }
+      
       if (!isDragging) {
         const rect = worldElement.getBoundingClientRect();
         const x = e.clientX - rect.left;

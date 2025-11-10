@@ -28,8 +28,8 @@ export class Body {
   y: number;
   prevX: number;
   prevY: number;
-  ax: number;
-  ay: number;
+  fx: number; // Accumulated force (like Matter.js body.force)
+  fy: number;
   
   // Properties
   mass: number;
@@ -38,6 +38,7 @@ export class Body {
   friction: number | null;
   isStatic: boolean;
   enabled: boolean;
+  isDragged: boolean; // Flag to skip physics when being dragged
 
   constructor(element: HTMLElement, world: World, config: BodyConfig = {}) {
     this.element = element;
@@ -59,8 +60,8 @@ export class Body {
     this.y = 0;
     this.prevX = 0;
     this.prevY = 0;
-    this.ax = 0;
-    this.ay = 0;
+    this.fx = 0; // Force accumulator (like Matter.js)
+    this.fy = 0;
     
     // Properties
     this.mass = config.mass ?? 1;
@@ -69,6 +70,7 @@ export class Body {
     this.friction = config.friction !== undefined ? config.friction : null;
     this.isStatic = config.isStatic ?? false;
     this.enabled = true;
+    this.isDragged = false;
     
     // Ensure can be transformed
     const display = getComputedStyle(element).display;
@@ -79,27 +81,74 @@ export class Body {
   
   applyForce(fx: number, fy: number): void {
     if (this.isStatic || !this.enabled) return;
-    this.ax += fx / this.mass;
-    this.ay += fy / this.mass;
+    // Accumulate forces directly (like Matter.js)
+    this.fx += fx;
+    this.fy += fy;
   }
   
   integrate(dt: number, world: World): void {
-    if (this.isStatic || !this.enabled) return;
+    if (this.isStatic || !this.enabled || this.isDragged) return;
     
-    this.ay += world.gravity;
+    // Matter.js exact Verlet integration:
+    // velocity = (velocityPrev * frictionAir) + (force / mass) * deltaTimeSquared
+    // position += velocity
     
+    // Calculate deltaTimeSquared (Matter.js style)
+    const deltaTimeSquared = dt * dt;
+    
+    // Calculate previous velocity from position difference (Matter.js style)
+    // Matter.js: velocityPrevX = (body.position.x - body.positionPrev.x) * correction
+    const velocityPrevX = (this.x - this.prevX);
+    const velocityPrevY = (this.y - this.prevY);
+    
+    // Get friction (air resistance in Matter.js terms)
+    // Matter.js: frictionAir = 1 - body.frictionAir * (deltaTime / baseDelta)
+    // We use a simpler approach: direct friction multiplier
     const friction = this.friction !== null ? this.friction : world.friction;
-    const vx = (this.x - this.prevX) * friction;
-    const vy = (this.y - this.prevY) * friction;
     
+    // Matter.js exact formula: velocity = (velocityPrev * frictionAir) + (force / mass) * deltaTimeSquared
+    const velocityX = (velocityPrevX * friction) + (this.fx / this.mass) * deltaTimeSquared;
+    const velocityY = (velocityPrevY * friction) + (this.fy / this.mass) * deltaTimeSquared;
+    
+    // Apply minimum velocity threshold to stop micro-jiggling
+    // BUT: Don't stop if forces are being applied (gravity, etc.) - let them accelerate
+    const minVelocity = 0.05; // pixels per frame
+    const hasActiveForces = Math.abs(this.fx) > 0.001 || Math.abs(this.fy) > 0.001;
+    
+    // Only stop if velocity is very small AND no forces are being applied
+    if (!hasActiveForces && Math.abs(velocityX) < minVelocity && Math.abs(velocityY) < minVelocity) {
+      // Stop the body - set prev position to current position
+      this.prevX = this.x;
+      this.prevY = this.y;
+      // Reset forces before returning
+      this.fx = 0;
+      this.fy = 0;
+      return;
+    }
+    
+    // Gradually reduce very small velocities (but only if no active forces)
+    let adjustedVx = velocityX;
+    let adjustedVy = velocityY;
+    if (!hasActiveForces) {
+      if (Math.abs(velocityX) < minVelocity * 2) {
+        adjustedVx = velocityX * 0.5; // Reduce velocity by 50%
+      }
+      if (Math.abs(velocityY) < minVelocity * 2) {
+        adjustedVy = velocityY * 0.5; // Reduce velocity by 50%
+      }
+    }
+    
+    // Matter.js: positionPrev = position, then position += velocity
     this.prevX = this.x;
     this.prevY = this.y;
     
-    this.x += vx + this.ax * dt * dt;
-    this.y += vy + this.ay * dt * dt;
+    // Update position using new velocity (Matter.js style)
+    this.x += adjustedVx;
+    this.y += adjustedVy;
     
-    this.ax = 0;
-    this.ay = 0;
+    // Reset forces (Matter.js resets forces after integration)
+    this.fx = 0;
+    this.fy = 0;
   }
   
   getWorldPosition(): { x: number; y: number } {

@@ -101,26 +101,26 @@ describe('Body', () => {
   });
 
   describe('applyForce', () => {
-    it('should apply force to acceleration', () => {
+    it('should apply force to force accumulator', () => {
       const body = new Body(element, world);
       body.applyForce(10, 20);
-      expect(body.ax).toBe(10 / body.mass);
-      expect(body.ay).toBe(20 / body.mass);
+      expect(body.fx).toBe(10);
+      expect(body.fy).toBe(20);
     });
 
     it('should not apply force if static', () => {
       const body = new Body(element, world, { isStatic: true });
       body.applyForce(10, 20);
-      expect(body.ax).toBe(0);
-      expect(body.ay).toBe(0);
+      expect(body.fx).toBe(0);
+      expect(body.fy).toBe(0);
     });
 
     it('should not apply force if disabled', () => {
       const body = new Body(element, world);
       body.enabled = false;
       body.applyForce(10, 20);
-      expect(body.ax).toBe(0);
-      expect(body.ay).toBe(0);
+      expect(body.fx).toBe(0);
+      expect(body.fy).toBe(0);
     });
   });
 
@@ -137,8 +137,8 @@ describe('Body', () => {
       // Should apply gravity, friction, and acceleration
       expect(body.prevX).toBe(10);
       expect(body.prevY).toBe(20);
-      expect(body.ax).toBe(0);
-      expect(body.ay).toBe(0);
+      expect(body.fx).toBe(0); // Forces reset after integrate
+      expect(body.fy).toBe(0);
     });
 
     it('should use world friction when body friction is null', () => {
