@@ -31,6 +31,11 @@ export class Body {
   fx: number; // Accumulated force (like Matter.js body.force)
   fy: number;
   
+  // Constraint support (like Matter.js)
+  constraintImpulseX: number; // Cached constraint corrections for warming
+  constraintImpulseY: number;
+  inverseMass: number; // 1/mass for constraint force distribution
+  
   // Properties
   mass: number;
   radius: number;
@@ -63,6 +68,10 @@ export class Body {
     this.fx = 0; // Force accumulator (like Matter.js)
     this.fy = 0;
     
+    // Constraint support
+    this.constraintImpulseX = 0;
+    this.constraintImpulseY = 0;
+    
     // Properties
     this.mass = config.mass ?? 1;
     this.radius = config.radius ?? Math.max(elemRect.width, elemRect.height) / 2;
@@ -71,6 +80,9 @@ export class Body {
     this.isStatic = config.isStatic ?? false;
     this.enabled = true;
     this.isDragged = false;
+    
+    // Calculate inverseMass after isStatic is set
+    this.inverseMass = this.isStatic ? 0 : (this.mass > 0 ? 1 / this.mass : 0);
     
     // Ensure can be transformed
     const display = getComputedStyle(element).display;

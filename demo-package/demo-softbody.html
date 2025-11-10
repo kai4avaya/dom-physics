@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOM Physics - Soft Body Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: #e8f5e9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    
+    #world {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      background: #ffffff;
+      border: 2px solid #4caf50;
+      overflow: visible;
+    }
+    
+    .particle {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: transparent; /* Hollow - no fill */
+      border: 3px solid #4caf50;
+      box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+    }
+    
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #4caf50;
+      font-size: 12px;
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 5px;
+      border: 1px solid #4caf50;
+    }
+  </style>
+</head>
+<body>
+  <div id="world">
+    <div class="controls">
+      <div>Soft Body Demo</div>
+      <div>Click to interact</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { World, Body, Constraint } from '/dist/index.js';
+    
+    const worldElement = document.getElementById('world');
+    const world = new World(worldElement, {
+      gravity: 300,
+      friction: 0.998, // Higher friction for stability
+      restitution: 0.1
+    });
+    
+    // Increase constraint iterations for soft bodies
+    world.constraintIterations = 4;
+    
+    // Create hollow ring/square of particles (like a virus membrane)
+    // Fewer particles, bigger size, hollow center
+    const particleRadius = 10;
+    const spacing = 35; // Larger spacing for bigger particles
+    const centerX = 400;
+    const centerY = 200;
+    
+    const particles = [];
+    const constraints = [];
+    
+    // Create a square ring (hollow inside) - simpler with fewer particles
+    const sideLength = 6; // Fewer particles per side for stability
+    const totalParticles = sideLength * 4 - 4; // 20 particles total
+    
+    // Top side
+    for (let i = 0; i < sideLength; i++) {
+      const x = centerX - (sideLength - 1) * spacing / 2 + i * spacing;
+      const y = centerY - (sideLength - 1) * spacing / 2;
+      particles.push(createParticle(x, y, particleRadius));
+    }
+    
+    // Right side (skip top corner)
+    for (let i = 1; i < sideLength; i++) {
+      const x = centerX + (sideLength - 1) * spacing / 2;
+      const y = centerY - (sideLength - 1) * spacing / 2 + i * spacing;
+      particles.push(createParticle(x, y, particleRadius));
+    }
+    
+    // Bottom side (skip right corner)
+    for (let i = sideLength - 2; i >= 0; i--) {
+      const x = centerX - (sideLength - 1) * spacing / 2 + i * spacing;
+      const y = centerY + (sideLength - 1) * spacing / 2;
+      particles.push(createParticle(x, y, particleRadius));
+    }
+    
+    // Left side (skip bottom and top corners)
+    for (let i = sideLength - 2; i > 0; i--) {
+      const x = centerX - (sideLength - 1) * spacing / 2;
+      const y = centerY - (sideLength - 1) * spacing / 2 + i * spacing;
+      particles.push(createParticle(x, y, particleRadius));
+    }
+    
+    function createParticle(x, y, radius) {
+      const particle = document.createElement('div');
+      particle.className = 'particle';
+      particle.style.left = (x - radius) + 'px';
+      particle.style.top = (y - radius) + 'px';
+      worldElement.appendChild(particle);
+      
+      const body = new Body(particle, world, {
+        mass: 0.5, // Heavier for stability
+        radius: radius,
+        restitution: 0.1
+      });
+      
+      world.registerBody(body);
+      return body;
+    }
+    
+    // Wait a frame for bodies to initialize before creating constraints
+    requestAnimationFrame(() => {
+      // Connect particles in ring (each to next)
+      for (let i = 0; i < particles.length; i++) {
+        const next = (i + 1) % particles.length;
+        const worldA = particles[i].getWorldPosition();
+        const worldB = particles[next].getWorldPosition();
+        const dx = worldB.x - worldA.x;
+        const dy = worldB.y - worldA.y;
+        const actualSpacing = Math.sqrt(dx * dx + dy * dy);
+        
+        const constraint = new Constraint({
+          bodyA: particles[i],
+          bodyB: particles[next],
+          length: actualSpacing, // Use actual measured distance
+          stiffness: 0.8, // Increased stiffness for stability
+          damping: 0.3 // Increased damping to reduce wild motion
+        });
+        world.registerConstraint(constraint);
+        constraints.push(constraint);
+      }
+      
+      // Anchor top center particle
+      const topIndex = Math.floor(sideLength / 2);
+      const topParticle = particles[topIndex];
+      const topPos = topParticle.getWorldPosition();
+      const anchorConstraint = new Constraint({
+        bodyA: null,
+        bodyB: topParticle,
+        pointA: { x: topPos.x, y: topPos.y - 80 },
+        length: 0,
+        stiffness: 0.9
+      });
+      world.registerConstraint(anchorConstraint);
+      constraints.push(anchorConstraint);
+      
+      // No initial motion - let it settle naturally
+    });
+    
+    world.start();
+    
+    // Click interaction: push nearest particle
+    worldElement.addEventListener('click', (e) => {
+      const rect = worldElement.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      
+      // Find nearest particle
+      let nearestBody = null;
+      let minDist = Infinity;
+      
+      particles.forEach((body) => {
+        const pos = body.getWorldPosition();
+        const dx = pos.x - mx;
+        const dy = pos.y - my;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < minDist && dist < 80) {
+          minDist = dist;
+          nearestBody = body;
+        }
+      });
+      
+      if (nearestBody) {
+        // Apply gentle impulse
+        const pos = nearestBody.getWorldPosition();
+        const dx = mx - pos.x;
+        const dy = my - pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist > 0) {
+          const impulse = 50; // Much gentler impulse for soft bodies
+          const vx = (dx / dist) * impulse;
+          const vy = (dy / dist) * impulse;
+          nearestBody.prevX = nearestBody.x - vx * world.timeStep;
+          nearestBody.prevY = nearestBody.y - vy * world.timeStep;
+        }
+      }
+    });
+  </script>
+</body>
+</html>

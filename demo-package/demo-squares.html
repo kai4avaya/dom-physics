@@ -12,7 +12,7 @@
     }
     
     body {
-      background: #f5f5f5;
+      background: #f0e8f5;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       overflow: hidden;
       display: flex;
@@ -26,27 +26,29 @@
       width: 800px;
       height: 600px;
       background: #ffffff;
-      border: 2px solid #333;
-      overflow: hidden;
+      border: 2px solid #6b4c7a;
+      overflow: visible; /* Changed from hidden to visible to prevent clipping */
     }
     
     .square {
       position: absolute;
       width: 30px;
       height: 30px;
-      background: #666;
-      border: 1px solid #333;
+      background: #8b6fa0;
+      border: 1px solid #6b4c7a;
+      box-shadow: 0 2px 4px rgba(107, 76, 122, 0.2);
     }
     
     .controls {
       position: absolute;
       top: 10px;
       left: 10px;
-      color: #333;
+      color: #6b4c7a;
       font-size: 12px;
       z-index: 1000;
-      background: rgba(255, 255, 255, 0.8);
+      background: rgba(255, 255, 255, 0.9);
       padding: 5px;
+      border: 1px solid #6b4c7a;
     }
   </style>
 </head>
@@ -112,15 +114,26 @@
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
       
+      console.log(`[Drag] mousedown at (${mx.toFixed(1)}, ${my.toFixed(1)})`);
+      
       // Find closest body
       let closestBody = null;
       let minDist = Infinity;
+      const candidates = [];
       
-      bodies.forEach((body) => {
+      bodies.forEach((body, index) => {
+        // Skip bodies that are currently being dragged
+        if (body.isDragged) {
+          candidates.push({ index, dist: Infinity, pos: body.getWorldPosition(), body, skipped: 'dragged' });
+          return;
+        }
+        
         const pos = body.getWorldPosition();
         const dx = pos.x - mx;
         const dy = pos.y - my;
         const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        candidates.push({ index, dist, pos, body });
         
         if (dist < 30 && dist < minDist) {
           minDist = dist;
@@ -128,19 +141,29 @@
         }
       });
       
+      // Log all candidates sorted by distance
+      candidates.sort((a, b) => a.dist - b.dist);
+      console.log(`[Drag] Candidates (top 5):`);
+      candidates.slice(0, 5).forEach(c => {
+        console.log(`  Square ${c.index}: dist=${c.dist.toFixed(1)}, pos=(${c.pos.x.toFixed(1)}, ${c.pos.y.toFixed(1)}), center dist=${c.dist.toFixed(1)}`);
+      });
+      
       if (closestBody) {
+        const selectedIndex = bodies.indexOf(closestBody);
+        const selectedPos = closestBody.getWorldPosition();
+        console.log(`[Drag] Selected square ${selectedIndex} at (${selectedPos.x.toFixed(1)}, ${selectedPos.y.toFixed(1)}), distance=${minDist.toFixed(1)}`);
+        
         draggedBody = closestBody;
         isDragging = true;
         dragStartTime = Date.now();
         draggedBody.isDragged = true;
         
         // Initialize drag tracking
-        const rect = worldElement.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
         lastDragX = mx - draggedBody.originX;
         lastDragY = my - draggedBody.originY;
         dragVelocities = [];
+      } else {
+        console.log(`[Drag] No square found within 30px`);
       }
     });
     
