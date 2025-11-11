@@ -54,6 +54,15 @@
       padding: 0;
     }
     
+    .text span.space {
+     <!-- display: inline; -->
+      display: inline-block;
+      <!-- content: " "; -->
+      <!-- white-space: pre; -->
+    }
+
+
+    
     .physics-active .text span {
       position: relative;
     }
@@ -112,64 +121,200 @@
     let world = null;
     let bodies = [];
     
-    function initializePhysics() {
-      if (initialized) return;
-      initialized = true;
+    <!-- function initializePhysics() { -->
+      <!-- if (initialized) return; -->
+      <!-- initialized = true; -->
       
-      const text = textElement.innerHTML;
-      let wrapped = '';
-      let i = 0;
+      <!-- const text = textElement.innerHTML; -->
+      <!-- let wrapped = ''; -->
+
+      <!-- const computedStyle = getComputedStyle(textElement); -->
+      <!-- const fontSize = parseFloat(computedStyle.fontSize); // e.g., 18px -> 18 -->
+      <!-- const lineHeightRatio = parseFloat(computedStyle.lineHeight); // e.g., 1.8 -> 1.8 -->
+      <!-- const spaceHeight = fontSize * lineHeightRatio; // 18 * 1.8 = 32.4 -->
+
+      <!-- // Temporary element creation to measure a space's width -->
+      <!-- const tempSpan = document.createElement('span'); -->
+      <!-- tempSpan.style.fontSize = getComputedStyle(textElement).fontSize; -->
+      <!-- tempSpan.innerHTML = ' '; -->
+      <!-- textElement.appendChild(tempSpan); -->
+
+      <!-- // Get the actual computed width of a single space character -->
+      <!-- const spaceWidth = tempSpan.getBoundingClientRect().width; --> 
+      <!-- textElement.removeChild(tempSpan); --> 
+      <!-- // Now, spaceWidth holds the exact width needed! -->
+
+      <!-- let i = 0; -->
       
-      while (i < text.length) {
-        const char = text[i];
+      <!-- while (i < text.length) { -->
+        <!-- const char = text[i]; -->
         
-        if (char === '<') {
-          // Extract the entire tag
-          let tag = '';
-          while (i < text.length && text[i] !== '>') {
-            tag += text[i];
-            i++;
-          }
-          if (i < text.length) {
-            tag += text[i]; // Include the '>'
-            i++;
-          }
-          wrapped += tag;
-        } else if (char === ' ') {
-          wrapped += '<span class="space"> </span>';
-          i++;
-        } else if (char === '\n') {
-          i++;
-        } else {
-          wrapped += `<span>${char}</span>`;
+        <!-- if (char === '<') { -->
+          <!-- // Extract the entire tag -->
+          <!-- let tag = ''; -->
+          <!-- while (i < text.length && text[i] !== '>') { -->
+            <!-- tag += text[i]; -->
+            <!-- i++; -->
+          <!-- } -->
+          <!-- if (i < text.length) { -->
+            <!-- tag += text[i]; // Include the '>' -->
+            <!-- i++; -->
+          <!-- } -->
+          <!-- wrapped += tag; -->
+        <!-- } else if (char === ' ') { -->
+        <!-- // Inject the calculated width and height (line-height) directly -->
+<!-- wrapped += `<span class="space" style="width: ${spaceWidth}px; height: ${spaceHeight}px;"> </span>`;            wrapped += `<span class="space" style="width: ${spaceWidth}px; height: 1.8em;"> </span>`; -->
+            <!-- i++; -->
+        <!-- } else if (char === '\n') { -->
+          <!-- i++; -->
+        <!-- } else { -->
+          <!-- wrapped += `<span>${char}</span>`; -->
+          <!-- i++; -->
+        <!-- } -->
+      <!-- } -->
+      
+      <!-- textElement.innerHTML = wrapped; -->
+      
+      <!-- world = new World(worldElement, { -->
+        <!-- gravity: 400, -->
+        <!-- friction: 0.97, -->
+        <!-- restitution: 0.5 -->
+      <!-- }); -->
+      
+      <!-- const spans = textElement.querySelectorAll('span:not(.space)'); -->
+
+      <!-- const spans = textElement.querySelectorAll('span'); -->
+
+      <!-- spans.forEach((span) => { -->
+      <!-- // Check if this span is a space -->
+      <!-- const isSpace = span.classList.contains('space'); -->
+      
+      <!-- const body = new Body(span, world, { -->
+        <!-- mass: 1, -->
+        <!-- radius: 8, -->
+        <!-- restitution: 0.6, -->
+        <!-- // Make spaces STATIC, and letters DYNAMIC -->
+        <!-- isStatic: isSpace --> 
+      <!-- }); -->
+      
+        <!-- const body = new Body(span, world, { -->
+          <!-- mass: 1, -->
+          <!-- radius: 8, -->
+          <!-- restitution: 0.6 -->
+        <!-- }); -->
+        <!-- world.registerBody(body); -->
+        <!-- bodies.push(body); -->
+        <!-- if (!isSpace) { -->
+        <!-- bodies.push(body); -->
+      <!-- } -->
+      <!-- }); -->
+      
+      <!-- worldElement.classList.add('physics-active'); -->
+      <!-- world.start(); -->
+    <!-- } -->
+
+function initializePhysics() {
+    if (initialized) return;
+    initialized = true;
+    
+    const text = textElement.innerHTML;
+    let wrapped = '';
+
+    const computedStyle = getComputedStyle(textElement);
+    const fontSize = parseFloat(computedStyle.fontSize); // e.g., 18px -> 18
+    
+    // --- FIX FOR LINE HEIGHT ---
+    // parseFloat(computedStyle.lineHeight) might return pixels if it's set in px.
+    // We need the *ratio* (1.8).
+    // This is a safer way to get the pixel height.
+    const tempLine = document.createElement('div');
+    tempLine.style.lineHeight = computedStyle.lineHeight;
+    tempLine.style.fontSize = computedStyle.fontSize;
+    tempLine.style.position = 'absolute';
+    tempLine.style.visibility = 'hidden';
+    tempLine.innerHTML = 'A'; // Add content to measure
+    document.body.appendChild(tempLine);
+    const spaceHeight = tempLine.getBoundingClientRect().height;
+    document.body.removeChild(tempLine);
+    // --- END FIX ---
+
+    // Temporary element creation to measure a space's width
+    const tempSpan = document.createElement('span');
+    tempSpan.style.fontSize = getComputedStyle(textElement).fontSize;
+    tempSpan.innerHTML = ' ';
+    textElement.appendChild(tempSpan);
+
+    // Get the actual computed width of a single space character
+    const spaceWidth = tempSpan.getBoundingClientRect().width; 
+    textElement.removeChild(tempSpan); 
+    // Now, spaceWidth holds the exact width needed!
+
+    let i = 0;
+    
+    while (i < text.length) {
+      const char = text[i];
+      
+      if (char === '<') {
+        // Extract the entire tag
+        let tag = '';
+        while (i < text.length && text[i] !== '>') {
+          tag += text[i];
           i++;
         }
+        if (i < text.length) {
+          tag += text[i]; // Include the '>'
+          i++;
+        }
+        wrapped += tag;
+      } else if (char === ' ') {
+        
+        // --- FIX: REMOVED DUPLICATE LINE ---
+        // Inject the calculated width and height (line-height) directly
+        wrapped += `<span class="space" style="width: ${spaceWidth}px; height: ${spaceHeight}px;"> </span>`;
+        i++;
+
+      } else if (char === '\n') {
+        i++;
+      } else {
+        wrapped += `<span>${char}</span>`;
+        i++;
       }
-      
-      textElement.innerHTML = wrapped;
-      
-      world = new World(worldElement, {
-        gravity: 400,
-        friction: 0.97,
-        restitution: 0.5
-      });
-      
-      const spans = textElement.querySelectorAll('span:not(.space)');
-      
-      spans.forEach((span) => {
-        const body = new Body(span, world, {
-          mass: 1,
-          radius: 8,
-          restitution: 0.6
-        });
-        world.registerBody(body);
-        bodies.push(body);
-      });
-      
-      worldElement.classList.add('physics-active');
-      world.start();
     }
     
+    textElement.innerHTML = wrapped;
+    
+    world = new World(worldElement, {
+      gravity: 400,
+      friction: 0.97,
+      restitution: 0.5
+    });
+    
+    const spans = textElement.querySelectorAll('span');
+
+    spans.forEach((span) => {
+      // Check if this span is a space
+      const isSpace = span.classList.contains('space');
+      
+      // --- FIX: REMOVED DUPLICATE 'const body' ---
+      const body = new Body(span, world, {
+        mass: 1,
+        radius: 8,
+        restitution: 0.6,
+        // Make spaces STATIC, and letters DYNAMIC
+        isStatic: isSpace 
+      });
+
+      world.registerBody(body);
+      
+      if (!isSpace) {
+        bodies.push(body);
+      }
+    });
+    
+    worldElement.classList.add('physics-active');
+    world.start();
+  }
+      
     textElement.addEventListener('mousemove', (e) => {
       if (!initialized) {
         initializePhysics();

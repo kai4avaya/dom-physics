@@ -68,8 +68,8 @@
     const worldElement = document.getElementById('world');
     const world = new World(worldElement, {
       gravity: 400,
-      friction: 0.95,
-      restitution: 0.3
+      friction: 0.98, // Higher friction for better stacking stability
+      restitution: 0.1 // Lower restitution to reduce bouncing
     });
     
     const bodies = [];
@@ -82,14 +82,17 @@
       block.style.top = y + 'px';
       worldElement.appendChild(block);
       
-      // For rectangular blocks, radius should be half the diagonal
+      // For rectangular blocks, use a smaller base radius to prevent floating
+      // But we'll expand collision detection dynamically for fast-moving blocks
       const height = 30;
-      const radius = Math.sqrt(width * width + height * height) / 2;
+      // Use a smaller base radius - prevents floating, but we expand it for fast objects
+      const radius = height * 0.5; // 15px base radius - prevents floating
       
       const body = new Body(block, world, {
         mass: (width * height) / 1000, // Mass proportional to area
-        radius: radius,
-        restitution: 0.3
+        radius: radius, // Smaller radius prevents premature collisions
+        restitution: 0.1, // Lower restitution for stable stacking
+        friction: 0.98 // Higher friction to prevent sliding
       });
       
       world.registerBody(body);
@@ -98,18 +101,22 @@
       return body;
     }
     
-    // Create initial stack - positioned carefully so they stack
+    // Create initial stack - positioned so blocks are touching (no gaps)
     const startX = 300;
     const startY = 50;
+    const blockHeight = 30;
     const widths = [200, 150, 100];
     const classes = ['wide', 'medium', 'narrow'];
     
     for (let i = 0; i < 8; i++) {
       const width = widths[i % widths.length];
       const className = classes[i % classes.length];
-      // Stack them with slight overlap to ensure they're touching
-      createBlock(startX - width / 2, startY + i * 32, width, className);
+      // Stack them touching (no gaps) - each block starts exactly on top of previous
+      createBlock(startX - width / 2, startY + i * blockHeight, width, className);
     }
+    
+    // Enable stack debugging
+    window.__debugStack = true;
     
     world.start();
     

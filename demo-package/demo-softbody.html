@@ -32,12 +32,11 @@
     
     .particle {
       position: absolute;
-      width: 20px;
-      height: 20px;
       border-radius: 50%;
       background: transparent; /* Hollow - no fill */
       border: 3px solid #4caf50;
       box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+      pointer-events: none;
     }
     
     .controls {
@@ -57,12 +56,12 @@
   <div id="world">
     <div class="controls">
       <div>Soft Body Demo</div>
-      <div>Click to interact</div>
+      <div>Click and drag particles</div>
     </div>
   </div>
 
   <script type="module">
-    import { World, Body, Constraint } from '/dist/index.js';
+    import { World, createSoftBody, Constraint } from '/dist/index.js';
     
     const worldElement = document.getElementById('world');
     const world = new World(worldElement, {
@@ -71,94 +70,33 @@
       restitution: 0.1
     });
     
-    // Increase constraint iterations for soft bodies
-    world.constraintIterations = 4;
+    // Matter.js uses 2 iterations by default - sufficient for soft bodies
+    world.constraintIterations = 2;
     
-    // Create hollow ring/square of particles (like a virus membrane)
-    // Fewer particles, bigger size, hollow center
-    const particleRadius = 10;
-    const spacing = 35; // Larger spacing for bigger particles
-    const centerX = 400;
-    const centerY = 200;
-    
-    const particles = [];
-    const constraints = [];
-    
-    // Create a square ring (hollow inside) - simpler with fewer particles
-    const sideLength = 6; // Fewer particles per side for stability
-    const totalParticles = sideLength * 4 - 4; // 20 particles total
-    
-    // Top side
-    for (let i = 0; i < sideLength; i++) {
-      const x = centerX - (sideLength - 1) * spacing / 2 + i * spacing;
-      const y = centerY - (sideLength - 1) * spacing / 2;
-      particles.push(createParticle(x, y, particleRadius));
-    }
-    
-    // Right side (skip top corner)
-    for (let i = 1; i < sideLength; i++) {
-      const x = centerX + (sideLength - 1) * spacing / 2;
-      const y = centerY - (sideLength - 1) * spacing / 2 + i * spacing;
-      particles.push(createParticle(x, y, particleRadius));
-    }
-    
-    // Bottom side (skip right corner)
-    for (let i = sideLength - 2; i >= 0; i--) {
-      const x = centerX - (sideLength - 1) * spacing / 2 + i * spacing;
-      const y = centerY + (sideLength - 1) * spacing / 2;
-      particles.push(createParticle(x, y, particleRadius));
-    }
-    
-    // Left side (skip bottom and top corners)
-    for (let i = sideLength - 2; i > 0; i--) {
-      const x = centerX - (sideLength - 1) * spacing / 2;
-      const y = centerY - (sideLength - 1) * spacing / 2 + i * spacing;
-      particles.push(createParticle(x, y, particleRadius));
-    }
-    
-    function createParticle(x, y, radius) {
-      const particle = document.createElement('div');
-      particle.className = 'particle';
-      particle.style.left = (x - radius) + 'px';
-      particle.style.top = (y - radius) + 'px';
-      worldElement.appendChild(particle);
-      
-      const body = new Body(particle, world, {
-        mass: 0.5, // Heavier for stability
-        radius: radius,
-        restitution: 0.1
-      });
-      
-      world.registerBody(body);
-      return body;
-    }
-    
-    // Wait a frame for bodies to initialize before creating constraints
-    requestAnimationFrame(() => {
-      // Connect particles in ring (each to next)
-      for (let i = 0; i < particles.length; i++) {
-        const next = (i + 1) % particles.length;
-        const worldA = particles[i].getWorldPosition();
-        const worldB = particles[next].getWorldPosition();
-        const dx = worldB.x - worldA.x;
-        const dy = worldB.y - worldA.y;
-        const actualSpacing = Math.sqrt(dx * dx + dy * dy);
-        
-        const constraint = new Constraint({
-          bodyA: particles[i],
-          bodyB: particles[next],
-          length: actualSpacing, // Use actual measured distance
-          stiffness: 0.8, // Increased stiffness for stability
-          damping: 0.3 // Increased damping to reduce wild motion
-        });
-        world.registerConstraint(constraint);
-        constraints.push(constraint);
+    // Create soft body using helper function (Matter.js style)
+    const softBody = createSoftBody(
+      world,
+      worldElement,
+      400,  // x
+      200,  // y
+      8,    // columns
+      6,    // rows
+      12,   // particle radius
+      30,   // spacing
+      {
+        stiffness: 0.2,  // Matter.js default for soft body
+        damping: 0.1,    // Damping to prevent energy buildup
+        crossBrace: true  // Add diagonal constraints for stability
       }
-      
-      // Anchor top center particle
-      const topIndex = Math.floor(sideLength / 2);
-      const topParticle = particles[topIndex];
+    );
+    
+    // Optionally anchor top center particle
+    requestAnimationFrame(() => {
+      const columns = 8;
+      const topCenterIndex = Math.floor(columns / 2); // Center of top row (index 3)
+      const topParticle = softBody.bodies[topCenterIndex];
       const topPos = topParticle.getWorldPosition();
+      
       const anchorConstraint = new Constraint({
         bodyA: null,
         bodyB: topParticle,
@@ -167,48 +105,110 @@
         stiffness: 0.9
       });
       world.registerConstraint(anchorConstraint);
-      constraints.push(anchorConstraint);
-      
-      // No initial motion - let it settle naturally
     });
     
     world.start();
     
-    // Click interaction: push nearest particle
-    worldElement.addEventListener('click', (e) => {
+    // Drag and drop interaction
+    let draggedBody = null;
+    let isDragging = false;
+    let lastDragX = null;
+    let lastDragY = null;
+    
+    worldElement.addEventListener('mousedown', (e) => {
       const rect = worldElement.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
       
-      // Find nearest particle
-      let nearestBody = null;
+      // Find closest body from soft body
+      let closestBody = null;
       let minDist = Infinity;
       
-      particles.forEach((body) => {
+      softBody.bodies.forEach((body) => {
+        if (body.isDragged) return; // Skip already dragged bodies
+        
         const pos = body.getWorldPosition();
         const dx = pos.x - mx;
         const dy = pos.y - my;
         const dist = Math.sqrt(dx * dx + dy * dy);
         
-        if (dist < minDist && dist < 80) {
+        if (dist < 50 && dist < minDist) {
           minDist = dist;
-          nearestBody = body;
+          closestBody = body;
         }
       });
       
-      if (nearestBody) {
-        // Apply gentle impulse
-        const pos = nearestBody.getWorldPosition();
-        const dx = mx - pos.x;
-        const dy = my - pos.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist > 0) {
-          const impulse = 50; // Much gentler impulse for soft bodies
-          const vx = (dx / dist) * impulse;
-          const vy = (dy / dist) * impulse;
-          nearestBody.prevX = nearestBody.x - vx * world.timeStep;
-          nearestBody.prevY = nearestBody.y - vy * world.timeStep;
+      if (closestBody) {
+        draggedBody = closestBody;
+        isDragging = true;
+        draggedBody.isDragged = true;
+        
+        // Initialize drag tracking
+        const pos = draggedBody.getWorldPosition();
+        lastDragX = mx - draggedBody.originX;
+        lastDragY = my - draggedBody.originY;
+      }
+    });
+    
+    worldElement.addEventListener('mousemove', (e) => {
+      if (isDragging && draggedBody) {
+        const rect = worldElement.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        
+        // Directly set position to follow mouse
+        const targetX = mx - draggedBody.originX;
+        const targetY = my - draggedBody.originY;
+        
+        draggedBody.x = targetX;
+        draggedBody.y = targetY;
+        draggedBody.prevX = targetX;
+        draggedBody.prevY = targetY;
+        
+        // Update last drag position
+        lastDragX = targetX;
+        lastDragY = targetY;
+        
+        // Render immediately to show the dragged body
+        draggedBody.render();
+      }
+    });
+    
+    worldElement.addEventListener('mouseup', (e) => {
+      if (isDragging && draggedBody) {
+        // Calculate release velocity for momentum
+        if (lastDragX !== null && lastDragY !== null) {
+          const rect = worldElement.getBoundingClientRect();
+          const mx = e.clientX - rect.left;
+          const my = e.clientY - rect.top;
+          
+          const targetX = mx - draggedBody.originX;
+          const targetY = my - draggedBody.originY;
+          
+          const vx = (targetX - lastDragX) / world.timeStep;
+          const vy = (targetY - lastDragY) / world.timeStep;
+          
+          // Apply velocity on release
+          draggedBody.prevX = draggedBody.x - vx * world.timeStep;
+          draggedBody.prevY = draggedBody.y - vy * world.timeStep;
         }
+        
+        draggedBody.isDragged = false;
+        draggedBody = null;
+        isDragging = false;
+        lastDragX = null;
+        lastDragY = null;
+      }
+    });
+    
+    // Also handle mouse leave to cancel drag
+    worldElement.addEventListener('mouseleave', (e) => {
+      if (isDragging && draggedBody) {
+        draggedBody.isDragged = false;
+        draggedBody = null;
+        isDragging = false;
+        lastDragX = null;
+        lastDragY = null;
       }
     });
   </script>

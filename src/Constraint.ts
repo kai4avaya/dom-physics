@@ -90,11 +90,20 @@ export class Constraint {
    * Matches Matter.js implementation exactly
    */
   solve(timeScale: number): void {
-    // Skip if either body is disabled or being dragged
-    if (this.bodyA && (!this.bodyA.enabled || this.bodyA.isDragged)) {
+    // Skip if both bodies are disabled
+    if (this.bodyA && !this.bodyA.enabled && (!this.bodyB.enabled)) {
       return;
     }
-    if (!this.bodyB.enabled || this.bodyB.isDragged) {
+    if (!this.bodyB.enabled && (!this.bodyA || !this.bodyA.enabled)) {
+      return;
+    }
+    
+    // Check if bodies are being dragged
+    const aDragged = this.bodyA?.isDragged ?? false;
+    const bDragged = this.bodyB.isDragged;
+    
+    // Skip if both are dragged
+    if (aDragged && bDragged) {
       return;
     }
     
@@ -145,9 +154,12 @@ export class Constraint {
     }
     
     // Calculate total inverse mass for force distribution
-    const massTotal = (this.bodyA ? this.bodyA.inverseMass : 0) + this.bodyB.inverseMass;
+    // If a body is dragged, it has infinite effective mass (can't be moved by constraint)
+    const aInvMass = (aDragged || !this.bodyA) ? 0 : this.bodyA.inverseMass;
+    const bInvMass = bDragged ? 0 : this.bodyB.inverseMass;
+    const massTotal = aInvMass + bInvMass;
     
-    if (massTotal === 0) return; // Both bodies are static
+    if (massTotal === 0) return; // Both bodies are static or dragged
     
     // Apply damping if specified (Matter.js style)
     let dampingX = 0;
@@ -175,12 +187,16 @@ export class Constraint {
       dampingY = dampingScale * ny * normalVelocity;
     }
     
-    // Apply to bodyA (if exists and not static)
+    // Calculate share of correction for each body (proportional to inverse mass)
+    // If a body is dragged, it gets 0 share (can't be moved by constraint)
+    const shareA = aInvMass / massTotal;
+    const shareB = bInvMass / massTotal;
+    
+    // Apply to bodyA (if exists, not static, and not dragged)
     // Matter.js: bodyA.position -= force * share, bodyA.positionPrev -= damping * share
-    if (this.bodyA && !this.bodyA.isStatic) {
-      const share = this.bodyA.inverseMass / massTotal;
-      const correctionX = forceX * share;
-      const correctionY = forceY * share;
+    if (this.bodyA && !this.bodyA.isStatic && !aDragged) {
+      const correctionX = forceX * shareA;
+      const correctionY = forceY * shareA;
       
       // Track impulse for constraint warming (Matter.js style)
       this.bodyA.constraintImpulseX -= correctionX;
@@ -194,17 +210,16 @@ export class Constraint {
       // Matter.js exact: bodyA.positionPrev -= damping * share
       // Damping reduces velocity by modifying previous position
       if (this.damping > 0) {
-        this.bodyA.prevX -= dampingX * share;
-        this.bodyA.prevY -= dampingY * share;
+        this.bodyA.prevX -= dampingX * shareA;
+        this.bodyA.prevY -= dampingY * shareA;
       }
     }
     
-    // Apply to bodyB
+    // Apply to bodyB (if not static and not dragged)
     // Matter.js: bodyB.position += force * share, bodyB.positionPrev += damping * share
-    if (!this.bodyB.isStatic) {
-      const share = this.bodyB.inverseMass / massTotal;
-      const correctionX = forceX * share;
-      const correctionY = forceY * share;
+    if (!this.bodyB.isStatic && !bDragged) {
+      const correctionX = forceX * shareB;
+      const correctionY = forceY * shareB;
       
       // Track impulse for constraint warming (Matter.js style)
       this.bodyB.constraintImpulseX += correctionX;
@@ -218,8 +233,8 @@ export class Constraint {
       // Matter.js exact: bodyB.positionPrev += damping * share
       // Damping reduces velocity by modifying previous position
       if (this.damping > 0) {
-        this.bodyB.prevX += dampingX * share;
-        this.bodyB.prevY += dampingY * share;
+        this.bodyB.prevX += dampingX * shareB;
+        this.bodyB.prevY += dampingY * shareB;
       }
     }
   }

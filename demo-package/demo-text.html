@@ -17,6 +17,12 @@
       overflow: hidden;
     }
     
+    body {
+      background: #f5f5f5;
+      font-family: Georgia, serif;
+      overflow: hidden;
+    }
+    
     .wrapper {
       position: relative;
       width: 800px;
@@ -33,11 +39,10 @@
     
     .container {
       padding: 40px;
-      padding-top: 80px;
     }
     
     .text {
-      font-size: 24px;
+      font-size: 18px;
       line-height: 1.8;
       color: #333;
       display: inline-block;
@@ -48,6 +53,15 @@
       margin: 0;
       padding: 0;
     }
+    
+    .text span.space {
+     <!-- display: inline; -->
+      display: inline-block;
+      <!-- content: " "; -->
+      <!-- white-space: pre; -->
+    }
+
+
     
     .physics-active .text span {
       position: relative;
@@ -61,7 +75,7 @@
     
     .attribution {
       position: absolute;
-      bottom: -60px;
+      bottom: -25px;
       right: 10px;
       font-size: 11px;
       color: #666;
@@ -98,7 +112,7 @@
   </div>
 
   <script type="module">
-    import { World, Body } from '/dist/index.js';
+    import { World, Body } from './dist/index.js';
     
     const worldElement = document.getElementById('world');
     const textElement = document.querySelector('.text');
@@ -107,65 +121,86 @@
     let world = null;
     let bodies = [];
     
-    function initializePhysics() {
-      if (initialized) return;
-      initialized = true;
+     
+function initializePhysics() {
+    if (initialized) return;
+    initialized = true;
+    
+    // --- DEBUG LOG ---
+    console.log('--- initializePhysics CALLED (v4 - &nbsp; version) ---');
+
+    const text = textElement.innerHTML;
+    let wrapped = '';
+    let i = 0;
+    
+    while (i < text.length) {
+      const char = text[i];
       
-      const text = textElement.innerHTML;
-      let wrapped = '';
-      let i = 0;
-      
-      while (i < text.length) {
-        const char = text[i];
-        
-        if (char === '<') {
-          // Extract the entire tag
-          let tag = '';
-          while (i < text.length && text[i] !== '>') {
-            tag += text[i];
-            i++;
-          }
-          if (i < text.length) {
-            tag += text[i]; // Include the '>'
-            i++;
-          }
-          wrapped += tag;
-        } else if (char === ' ') {
-          wrapped += '<span class="space"> </span>';
-          i++;
-        } else if (char === '\n') {
-          i++;
-        } else {
-          wrapped += `<span>${char}</span>`;
+      if (char === '<') {
+        // Extract the entire tag
+        let tag = '';
+        while (i < text.length && text[i] !== '>') {
+          tag += text[i];
           i++;
         }
+        if (i < text.length) {
+          tag += text[i]; // Include the '>'
+          i++;
+        }
+        wrapped += tag;
+      } else if (char === ' ') {
+        
+        // --- THIS IS THE ENTIRE FIX ---
+        // Use a non-breaking space (&nbsp;). This gives the span
+        // a natural, measurable width based on the font.
+        // No inline styles are needed.
+        wrapped += `<span class="space">&nbsp;</span>`;
+        i++;
+
+      } else if (char === '\n') {
+        i++;
+      } else {
+        wrapped += `<span>${char}</span>`;
+        i++;
       }
-      
-      textElement.innerHTML = wrapped;
-      
-      world = new World(worldElement, {
-        gravity: 400,
-        friction: 0.97,
-        restitution: 0.5
-      });
-      
-      const spans = textElement.querySelectorAll('span:not(.space)');
-      
-      spans.forEach((span) => {
-        const body = new Body(span, world, {
-          mass: 1,
-          radius: 8,
-          restitution: 0.6
-        });
-        world.registerBody(body);
-        bodies.push(body);
-      });
-      
-      worldElement.classList.add('physics-active');
-      world.start();
     }
     
-    textElement.addEventListener('mousemove', (e) => {
+    textElement.innerHTML = wrapped;
+    
+    world = new World(worldElement, {
+      gravity: 400,
+      friction: 0.97,
+      restitution: 0.5
+    });
+    
+    const spans = textElement.querySelectorAll('span');
+
+    spans.forEach((span) => {
+      const isSpace = span.classList.contains('space');
+      
+      // --- DEBUG LOG ---
+      const content = span.innerHTML === '&nbsp;' ? '[space]' : span.innerHTML;
+      console.log('Creating body for:', content, '| isStatic:', isSpace);
+
+      const body = new Body(span, world, {
+        mass: 1,
+        radius: 8,
+        restitution: 0.6,
+        isStatic: isSpace // Spaces are static, letters are dynamic
+      });
+
+      world.registerBody(body);
+      
+      if (!isSpace) {
+        bodies.push(body);
+      }
+    });
+    
+    worldElement.classList.add('physics-active');
+    world.start();
+  }
+
+      textElement.addEventListener('mousemove', (e) => {
       if (!initialized) {
         initializePhysics();
       }

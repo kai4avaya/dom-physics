@@ -171,6 +171,43 @@ export class Body {
   }
   
   render(): void {
+    // For static bodies, don't apply transform - keep them in normal flow
+    // This preserves spacing between letters in text demos
+    if (this.isStatic && this.x === 0 && this.y === 0) {
+
+      // Reset transform to keep in flow
+      this.element.style.transform = '';
+      return;
+    }
+    
+    // For dynamic bodies or moved static bodies, apply transform
     this.element.style.transform = `translate(${this.x}px, ${this.y}px)`;
+    
+    // Once a body moves, it needs to be positioned absolutely to not affect layout
+    if (!this.isStatic && this.element.style.position !== 'absolute') {
+      // Ensure display is inline-block for transforms to work
+      const display = getComputedStyle(this.element).display;
+      if (display === 'inline') {
+        this.element.style.display = 'inline-block';
+      }
+      
+      const rect = this.element.getBoundingClientRect();
+      const worldRect = this.world.container.getBoundingClientRect();
+      const currentX = rect.left - worldRect.left;
+      const currentY = rect.top - worldRect.top;
+      
+      // Set absolute position based on current world position
+      this.element.style.position = 'absolute';
+      this.element.style.left = `${currentX}px`;
+      this.element.style.top = `${currentY}px`;
+      
+      // Update origin to match new absolute position
+      this.originX = currentX;
+      this.originY = currentY;
+      this.x = 0;
+      this.y = 0;
+      this.prevX = 0;
+      this.prevY = 0;
+    }
   }
 }
