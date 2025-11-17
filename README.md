@@ -187,6 +187,31 @@ class Body {
 }
 ```
 
+### Input Controllers
+
+```typescript
+import { KeyboardController, MouseController } from 'dom-physics';
+
+const keyboard = new KeyboardController(world, '[data-physics-control]', 600);
+const mouse = new MouseController(world, {
+  selector: '[data-physics-control]',
+  capturePointer: true
+});
+
+// Later, if you tear down the world:
+keyboard.dispose();
+mouse.dispose();
+```
+
+Any element that matches the selector (defaults to `[data-physics-control]`) becomes interactive:
+
+```html
+<span class="letter" data-physics-control>H</span>
+```
+
+- **KeyboardController** maps arrow/WASD input to per-frame forces for the matching bodies.
+- **MouseController** lets users grab, drag, and flick bodies using pointer events while keeping the DOM layout intact.
+
 ## Configuration
 
 ### WorldConfig
