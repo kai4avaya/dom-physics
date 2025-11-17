@@ -17,6 +17,8 @@ export interface WorldConfig {
     width: number;
     height: number;
   };
+  spatialGrid?: boolean; // Enable spatial grid optimization (default: true)
+  spatialGridCellSize?: number; // Size of each grid cell in pixels (default: 100)
 }
 
 export class World {
@@ -44,6 +46,17 @@ export class World {
   // Cached constraint network for performance
   private _constraintNetworkCache: Map<Body, Set<Body>> | null = null;
   private _constraintNetworkDirty: boolean = true;
+  
+  // Spatial grid for collision optimization
+  private _spatialGrid: Map<string, Body[]> | null = null;
+  private _spatialGridDirty: boolean = true;
+  private _spatialGridEnabled: boolean;
+  private _spatialGridCellSize: number;
+  
+  // Body tracking for incremental grid updates
+  private _bodyCellMap: WeakMap<Body, Set<string>> = new WeakMap(); // Track which cells each body is in
+  private _bodyIdMap: WeakMap<Body, number> = new WeakMap(); // Unique ID for each body (for pair deduplication)
+  private _nextBodyId: number = 0;
 
   constructor(container: HTMLElement, config: WorldConfig = {}) {
     this.container = container;
@@ -55,6 +68,10 @@ export class World {
     this.restitution = config.restitution !== undefined ? config.restitution : 0.8;
     this.timeStep = config.timeStep ?? 1/60;
     this.constraintIterations = 2; // Matter.js default is 2, increase for longer chains
+    
+    // Spatial grid configuration
+    this._spatialGridEnabled = config.spatialGrid !== undefined ? config.spatialGrid : true;
+    this._spatialGridCellSize = config.spatialGridCellSize ?? 100;
     
     const rect = container.getBoundingClientRect();
     this.bounds = config.bounds || {
@@ -72,6 +89,9 @@ export class World {
   registerBody(body: Body): void {
     if (!this.bodies.includes(body)) {
       this.bodies.push(body);
+      // Assign unique ID for pair deduplication
+      this._bodyIdMap.set(body, this._nextBodyId++);
+      this._spatialGridDirty = true; // Mark grid dirty when bodies change
     }
   }
   
@@ -79,6 +99,10 @@ export class World {
     const index = this.bodies.indexOf(body);
     if (index !== -1) {
       this.bodies.splice(index, 1);
+      // Clean up body tracking
+      this._bodyCellMap.delete(body);
+      this._bodyIdMap.delete(body);
+      this._spatialGridDirty = true; // Mark grid dirty when bodies change
     }
   }
   
@@ -180,7 +204,7 @@ export class World {
     this._getConstraintNetwork();
     const networkTime = performance.now() - networkStart;
     
-    // Collisions - optimize for many bodies (like text demo)
+    // Collisions - use spatial grid optimization if enabled
     const collisionStart = performance.now();
     let collisionChecks = 0;
     let collisionSkips = 0;
@@ -189,52 +213,178 @@ export class World {
     let collisionBfsSkips = 0;
     let collisionResolved = 0;
     
-    // For many bodies, use spatial optimization: skip collisions between distant bodies
-    const maxCollisionDist = 100; // Only check collisions within 100px
-    const maxCollisionDistSq = maxCollisionDist * maxCollisionDist;
-    
-    for (let i = 0; i < this.bodies.length; i++) {
-      const bodyA = this.bodies[i];
-      const posA = bodyA.getWorldPosition();
+    if (this._spatialGridEnabled) {
+      // Spatial grid collision detection with incremental updates
+      const gridStart = performance.now();
+      const spatialGrid = this._buildSpatialGrid();
+      const gridTime = performance.now() - gridStart;
       
-      for (let j = i + 1; j < this.bodies.length; j++) {
-        const bodyB = this.bodies[j];
+      // Track which pairs we've already checked (avoid duplicate checks)
+      const checkedPairs = new Set<string>();
+      
+      // Maximum collision distance for early culling
+      const maxCollisionDist = this._spatialGridCellSize * 2; // Check up to 2 cells away
+      const maxCollisionDistSq = maxCollisionDist * maxCollisionDist;
+      
+      // Iterate through grid cells
+      for (const [cellKey, bodiesInCell] of spatialGrid.entries()) {
+        // Skip empty cells
+        if (bodiesInCell.length === 0) continue;
         
-        // Quick distance check - skip if too far apart
-        const posB = bodyB.getWorldPosition();
-        const dx = posB.x - posA.x;
-        const dy = posB.y - posA.y;
-        const distSq = dx * dx + dy * dy;
-        
-        // Skip collision check if bodies are too far apart
-        if (distSq > maxCollisionDistSq) {
-          collisionSkips++;
-          continue;
+        // Check collisions within same cell
+        for (let i = 0; i < bodiesInCell.length; i++) {
+          const bodyA = bodiesInCell[i];
+          
+          for (let j = i + 1; j < bodiesInCell.length; j++) {
+            const bodyB = bodiesInCell[j];
+            
+            // Create unique pair key using proper ID system
+            const pairKey = this._getPairKey(bodyA, bodyB);
+            if (checkedPairs.has(pairKey)) continue;
+            checkedPairs.add(pairKey);
+            
+            collisionChecks++;
+            const skipReason = this.resolveCollision(bodyA, bodyB);
+            if (skipReason === 'direct') collisionDirectSkips++;
+            else if (skipReason === 'softbody') collisionSoftBodySkips++;
+            else if (skipReason === 'bfs') collisionBfsSkips++;
+            else if (skipReason === 'resolved') collisionResolved++;
+            else collisionSkips++;
+          }
         }
         
-        collisionChecks++;
-        const skipReason = this.resolveCollision(bodyA, bodyB);
-        if (skipReason === 'direct') collisionDirectSkips++;
-        else if (skipReason === 'softbody') collisionSoftBodySkips++;
-        else if (skipReason === 'bfs') collisionBfsSkips++;
-        else if (skipReason === 'resolved') collisionResolved++;
-        else collisionSkips++;
+        // Check collisions with neighboring cells (for bodies near cell boundaries)
+        // Only check 4 neighbors (not 8) to reduce duplicate checks - each pair will be checked once
+        const [cellX, cellY] = cellKey.split(',').map(Number);
+        const neighbors = [
+          `${cellX + 1},${cellY}`,     // Right
+          `${cellX},${cellY + 1}`,     // Bottom
+          `${cellX + 1},${cellY + 1}`, // Bottom-right
+          `${cellX - 1},${cellY + 1}`  // Bottom-left (only check this to avoid duplicates)
+        ];
+        
+        for (const neighborKey of neighbors) {
+          const neighborBodies = spatialGrid.get(neighborKey);
+          if (!neighborBodies || neighborBodies.length === 0) continue;
+          
+          // Early distance culling: check if cells are too far apart
+          const [neighborX, neighborY] = neighborKey.split(',').map(Number);
+          const cellDistSq = (neighborX - cellX) ** 2 + (neighborY - cellY) ** 2;
+          // Skip if cells are more than 2 cells apart (bodies can't collide)
+          if (cellDistSq > 4) continue;
+          
+          for (const bodyA of bodiesInCell) {
+            for (const bodyB of neighborBodies) {
+              if (bodyA === bodyB) continue;
+              
+              const pairKey = this._getPairKey(bodyA, bodyB);
+              if (checkedPairs.has(pairKey)) continue;
+              checkedPairs.add(pairKey);
+              
+              // Quick distance check before expensive collision resolution
+              const posA = bodyA.getWorldPosition();
+              const posB = bodyB.getWorldPosition();
+              const dx = posB.x - posA.x;
+              const dy = posB.y - posA.y;
+              const distSq = dx * dx + dy * dy;
+              
+              // Early exit: too far apart
+              if (distSq > maxCollisionDistSq) {
+                collisionSkips++;
+                continue;
+              }
+              
+              const minDist = bodyA.radius + bodyB.radius;
+              if (distSq > (minDist * minDist)) {
+                collisionSkips++;
+                continue;
+              }
+              
+              collisionChecks++;
+              const skipReason = this.resolveCollision(bodyA, bodyB);
+              if (skipReason === 'direct') collisionDirectSkips++;
+              else if (skipReason === 'softbody') collisionSoftBodySkips++;
+              else if (skipReason === 'bfs') collisionBfsSkips++;
+              else if (skipReason === 'resolved') collisionResolved++;
+              else collisionSkips++;
+            }
+          }
+        }
+      }
+      
+      // Mark grid for incremental update next frame (bodies may have moved)
+      // Don't mark as fully dirty - incremental update will handle it
+      // Only mark dirty if bodies were added/removed (handled in registerBody/unregisterBody)
+    } else {
+      // Fallback to original O(n²) collision detection (for comparison/testing)
+      const maxCollisionDist = 100; // Only check collisions within 100px
+      const maxCollisionDistSq = maxCollisionDist * maxCollisionDist;
+      
+      for (let i = 0; i < this.bodies.length; i++) {
+        const bodyA = this.bodies[i];
+        const posA = bodyA.getWorldPosition();
+        
+        for (let j = i + 1; j < this.bodies.length; j++) {
+          const bodyB = this.bodies[j];
+          
+          // Quick distance check - skip if too far apart
+          const posB = bodyB.getWorldPosition();
+          const dx = posB.x - posA.x;
+          const dy = posB.y - posA.y;
+          const distSq = dx * dx + dy * dy;
+          
+          // Skip collision check if bodies are too far apart
+          if (distSq > maxCollisionDistSq) {
+            collisionSkips++;
+            continue;
+          }
+          
+          collisionChecks++;
+          const skipReason = this.resolveCollision(bodyA, bodyB);
+          if (skipReason === 'direct') collisionDirectSkips++;
+          else if (skipReason === 'softbody') collisionSoftBodySkips++;
+          else if (skipReason === 'bfs') collisionBfsSkips++;
+          else if (skipReason === 'resolved') collisionResolved++;
+          else collisionSkips++;
+        }
       }
     }
     const collisionTime = performance.now() - collisionStart;
     
     const totalTime = performance.now() - perfStart;
     
+    // Store performance stats for external access
+    if (typeof window !== 'undefined') {
+      (window as any).__domPhysicsStats = {
+        totalTime,
+        gravityTime,
+        integrateTime,
+        constraintTime,
+        networkTime,
+        collisionTime,
+        collisionChecks,
+        collisionResolved,
+        collisionDirectSkips,
+        collisionSoftBodySkips,
+        collisionBfsSkips,
+        collisionSkips,
+        spatialGridEnabled: this._spatialGridEnabled,
+        bodyCount: this.bodies.length,
+        constraintCount: this.constraints.length
+      };
+    }
+    
     // Log performance only if explicitly enabled and step takes > 16ms (performance issue)
     if (typeof window !== 'undefined' && (window as any).__enablePerfLogging && totalTime > 16) {
       const frameCount = (window as any).__perfFrameCount || 0;
       (window as any).__perfFrameCount = frameCount + 1;
       
+      const gridInfo = this._spatialGridEnabled ? ' (spatial grid enabled)' : ' (spatial grid disabled)';
       console.log(`[Performance] Step ${frameCount}: total=${totalTime.toFixed(2)}ms, ` +
         `gravity=${gravityTime.toFixed(2)}ms, integrate=${integrateTime.toFixed(2)}ms, ` +
         `constraints=${constraintTime.toFixed(2)}ms (${this.constraints.length} constraints, ${this.constraintIterations} iter), ` +
         `network=${networkTime.toFixed(2)}ms, ` +
-        `collisions=${collisionTime.toFixed(2)}ms (${collisionChecks} checks: ${collisionResolved} resolved, ` +
+        `collisions=${collisionTime.toFixed(2)}ms${gridInfo} (${collisionChecks} checks: ${collisionResolved} resolved, ` +
         `${collisionDirectSkips} direct-skip, ${collisionSoftBodySkips} softbody-skip, ${collisionBfsSkips} bfs-skip, ${collisionSkips} other-skip)`);
     }
     
@@ -265,6 +415,134 @@ export class World {
     for (const body of this.bodies) {
       this.constrainToBounds(body);
     }
+  }
+  
+  /**
+   * Get cell key from world position for spatial grid
+   */
+  private _getCellKey(x: number, y: number): string {
+    const cellX = Math.floor(x / this._spatialGridCellSize);
+    const cellY = Math.floor(y / this._spatialGridCellSize);
+    return `${cellX},${cellY}`;
+  }
+  
+  /**
+   * Get all cells that a body overlaps (for bodies that span multiple cells)
+   */
+  private _getBodyCells(body: Body): string[] {
+    const pos = body.getWorldPosition();
+    const radius = body.radius;
+    
+    const minX = Math.floor((pos.x - radius) / this._spatialGridCellSize);
+    const maxX = Math.floor((pos.x + radius) / this._spatialGridCellSize);
+    const minY = Math.floor((pos.y - radius) / this._spatialGridCellSize);
+    const maxY = Math.floor((pos.y + radius) / this._spatialGridCellSize);
+    
+    const cells: string[] = [];
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        cells.push(`${x},${y}`);
+      }
+    }
+    return cells;
+  }
+  
+  /**
+   * Generate unique pair key for two bodies (for deduplication)
+   */
+  private _getPairKey(bodyA: Body, bodyB: Body): string {
+    const idA = this._bodyIdMap.get(bodyA) ?? 0;
+    const idB = this._bodyIdMap.get(bodyB) ?? 0;
+    // Always use smaller ID first for consistent ordering
+    return idA < idB ? `${idA}-${idB}` : `${idB}-${idA}`;
+  }
+  
+  /**
+   * Build spatial grid for collision optimization
+   * Uses incremental updates when possible - only rebuilds cells for bodies that moved
+   */
+  private _buildSpatialGrid(): Map<string, Body[]> {
+    if (!this._spatialGridEnabled) {
+      return new Map(); // Return empty map if disabled
+    }
+    
+    // If grid doesn't exist or is completely dirty, do full rebuild
+    if (!this._spatialGrid || this._spatialGridDirty) {
+      const grid = new Map<string, Body[]>();
+      
+      // Include ALL bodies in grid (both static and dynamic)
+      // Static bodies act as collision boundaries even though they don't move
+      for (const body of this.bodies) {
+        if (!body.enabled) continue; // Only skip disabled bodies
+        
+        const cells = this._getBodyCells(body);
+        const cellSet = new Set<string>(cells);
+        this._bodyCellMap.set(body, cellSet);
+        
+        for (const cellKey of cells) {
+          if (!grid.has(cellKey)) {
+            grid.set(cellKey, []);
+          }
+          grid.get(cellKey)!.push(body);
+        }
+      }
+      
+      this._spatialGrid = grid;
+      this._spatialGridDirty = false;
+      return grid;
+    }
+    
+    // Incremental update: only update cells for bodies that moved
+    // Static bodies don't move, so they don't need updates (but they stay in grid)
+    const grid = this._spatialGrid;
+    
+    for (const body of this.bodies) {
+      if (!body.enabled) continue; // Skip disabled bodies
+      
+      // Static bodies don't move, so skip incremental updates for them
+      // They're already in the grid from the initial build
+      if (body.isStatic) continue;
+      
+      const oldCells = this._bodyCellMap.get(body);
+      const newCells = this._getBodyCells(body);
+      const newCellSet = new Set<string>(newCells);
+      
+      // Check if body moved significantly (quick heuristic: compare cell sets)
+      const cellsChanged = !oldCells || 
+        oldCells.size !== newCellSet.size ||
+        ![...newCellSet].every(cell => oldCells.has(cell));
+      
+      if (cellsChanged) {
+        // Remove body from old cells
+        if (oldCells) {
+          for (const oldCellKey of oldCells) {
+            const cellBodies = grid.get(oldCellKey);
+            if (cellBodies) {
+              const index = cellBodies.indexOf(body);
+              if (index !== -1) {
+                cellBodies.splice(index, 1);
+                // Remove empty cells
+                if (cellBodies.length === 0) {
+                  grid.delete(oldCellKey);
+                }
+              }
+            }
+          }
+        }
+        
+        // Add body to new cells
+        for (const cellKey of newCells) {
+          if (!grid.has(cellKey)) {
+            grid.set(cellKey, []);
+          }
+          grid.get(cellKey)!.push(body);
+        }
+        
+        this._bodyCellMap.set(body, newCellSet);
+      }
+    }
+    
+    return grid;
   }
   
   /**

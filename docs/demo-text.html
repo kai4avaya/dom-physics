@@ -121,6 +121,72 @@
     let world = null;
     let bodies = [];
     
+    // Performance logging
+    let perfStats = {
+      frameCount: 0,
+      totalTime: 0,
+      minTime: Infinity,
+      maxTime: 0,
+      collisionChecks: 0,
+      collisionResolved: 0,
+      samples: []
+    };
+    
+    function logPerformance() {
+      const stats = window.__domPhysicsStats;
+      if (stats) {
+        perfStats.frameCount++;
+        perfStats.totalTime += stats.totalTime;
+        perfStats.minTime = Math.min(perfStats.minTime, stats.totalTime);
+        perfStats.maxTime = Math.max(perfStats.maxTime, stats.totalTime);
+        perfStats.collisionChecks += stats.collisionChecks || 0;
+        perfStats.collisionResolved += stats.collisionResolved || 0;
+        
+        // Sample every 60 frames (~1 second)
+        if (perfStats.frameCount % 60 === 0) {
+          const avgTime = perfStats.totalTime / perfStats.frameCount;
+          const fps = 1000 / avgTime;
+          
+          perfStats.samples.push({
+            frame: perfStats.frameCount,
+            avgTime: avgTime.toFixed(2),
+            minTime: perfStats.minTime.toFixed(2),
+            maxTime: perfStats.maxTime.toFixed(2),
+            fps: fps.toFixed(1),
+            collisionChecks: stats.collisionChecks,
+            collisionResolved: stats.collisionResolved,
+            bodyCount: stats.bodyCount
+          });
+          
+          console.log(`[Performance - NO SPATIAL GRID] Frame ${perfStats.frameCount}: ` +
+            `avg=${avgTime.toFixed(2)}ms (${fps.toFixed(1)}fps), ` +
+            `min=${perfStats.minTime.toFixed(2)}ms, max=${perfStats.maxTime.toFixed(2)}ms, ` +
+            `checks=${stats.collisionChecks}, resolved=${stats.collisionResolved}, ` +
+            `bodies=${stats.bodyCount}`);
+        }
+      }
+    }
+    
+    // Log performance every frame
+    const perfInterval = setInterval(logPerformance, 16);
+    
+    // Log summary on page unload
+    window.addEventListener('beforeunload', () => {
+      clearInterval(perfInterval);
+      if (perfStats.frameCount > 0) {
+        const avgTime = perfStats.totalTime / perfStats.frameCount;
+        const avgFps = 1000 / avgTime;
+        console.log(`\n[Performance Summary - NO SPATIAL GRID]`);
+        console.log(`Total frames: ${perfStats.frameCount}`);
+        console.log(`Average frame time: ${avgTime.toFixed(2)}ms (${avgFps.toFixed(1)}fps)`);
+        console.log(`Min frame time: ${perfStats.minTime.toFixed(2)}ms`);
+        console.log(`Max frame time: ${perfStats.maxTime.toFixed(2)}ms`);
+        console.log(`Total collision checks: ${perfStats.collisionChecks}`);
+        console.log(`Total collisions resolved: ${perfStats.collisionResolved}`);
+        console.log(`Performance samples:`, perfStats.samples);
+      }
+    });
+    
     <!-- function initializePhysics() { -->
       <!-- if (initialized) return; -->
       <!-- initialized = true; -->
@@ -286,7 +352,9 @@ function initializePhysics() {
     world = new World(worldElement, {
       gravity: 400,
       friction: 0.97,
-      restitution: 0.5
+      restitution: 0.5,
+      spatialGrid: true, // Enabled - optimized spatial grid with static body support
+      spatialGridCellSize: 25 // Smaller cells for better separation of clustered letters
     });
     
     const spans = textElement.querySelectorAll('span');

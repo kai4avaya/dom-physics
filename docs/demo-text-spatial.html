@@ -3,18 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DOM Physics - Text Demo</title>
+  <title>DOM Physics - Text Demo (Spatial Grid Enabled)</title>
   <style>
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-    }
-    
-    body {
-      background: #f5f5f5;
-      font-family: Georgia, serif;
-      overflow: hidden;
     }
     
     body {
@@ -57,27 +51,18 @@
     .text span.space {
       display: inline-block;
     }
-
-
     
     .physics-active .text span {
       position: relative;
     }
     
-    .wrapper {
-      position: relative;
-      width: 800px;
-      margin: 40px auto;
-    }
-    
     .attribution {
       position: absolute;
-      bottom: -50px;
+      bottom: -25px;
       right: 10px;
-      font-size: 14px;
+      font-size: 11px;
       color: #666;
       text-align: right;
-      line-height: 1.5;
     }
     
     .attribution a {
@@ -88,6 +73,7 @@
     .attribution a:hover {
       text-decoration: underline;
     }
+    
   </style>
 </head>
 <body>
@@ -118,6 +104,9 @@
     let initialized = false;
     let world = null;
     let bodies = [];
+    
+    // Enable performance logging
+    window.__enablePerfLogging = true;
     
     // Performance logging
     let perfStats = {
@@ -153,14 +142,15 @@
             fps: fps.toFixed(1),
             collisionChecks: stats.collisionChecks,
             collisionResolved: stats.collisionResolved,
-            bodyCount: stats.bodyCount
+            bodyCount: stats.bodyCount,
+            spatialGridEnabled: stats.spatialGridEnabled
           });
           
-          console.log(`[Performance - NO SPATIAL GRID] Frame ${perfStats.frameCount}: ` +
+          console.log(`[Performance - SPATIAL GRID ENABLED] Frame ${perfStats.frameCount}: ` +
             `avg=${avgTime.toFixed(2)}ms (${fps.toFixed(1)}fps), ` +
             `min=${perfStats.minTime.toFixed(2)}ms, max=${perfStats.maxTime.toFixed(2)}ms, ` +
             `checks=${stats.collisionChecks}, resolved=${stats.collisionResolved}, ` +
-            `bodies=${stats.bodyCount}`);
+            `bodies=${stats.bodyCount}, grid=${stats.spatialGridEnabled ? 'ON' : 'OFF'}`);
         }
       }
     }
@@ -174,7 +164,7 @@
       if (perfStats.frameCount > 0) {
         const avgTime = perfStats.totalTime / perfStats.frameCount;
         const avgFps = 1000 / avgTime;
-        console.log(`\n[Performance Summary - NO SPATIAL GRID]`);
+        console.log(`\n[Performance Summary - SPATIAL GRID ENABLED]`);
         console.log(`Total frames: ${perfStats.frameCount}`);
         console.log(`Average frame time: ${avgTime.toFixed(2)}ms (${avgFps.toFixed(1)}fps)`);
         console.log(`Min frame time: ${perfStats.minTime.toFixed(2)}ms`);
@@ -185,88 +175,100 @@
       }
     });
     
-     
-function initializePhysics() {
-    if (initialized) return;
-    initialized = true;
-    
-    // --- DEBUG LOG ---
-    console.log('--- initializePhysics CALLED (v4 - &nbsp; version) ---');
-
-    const text = textElement.innerHTML;
-    let wrapped = '';
-    let i = 0;
-    
-    while (i < text.length) {
-      const char = text[i];
+    function initializePhysics() {
+      if (initialized) return;
+      initialized = true;
       
-      if (char === '<') {
-        // Extract the entire tag
-        let tag = '';
-        while (i < text.length && text[i] !== '>') {
-          tag += text[i];
-          i++;
-        }
-        if (i < text.length) {
-          tag += text[i]; // Include the '>'
-          i++;
-        }
-        wrapped += tag;
-      } else if (char === ' ') {
+      const text = textElement.innerHTML;
+      let wrapped = '';
+
+      const computedStyle = getComputedStyle(textElement);
+      const fontSize = parseFloat(computedStyle.fontSize);
+      
+      const tempLine = document.createElement('div');
+      tempLine.style.lineHeight = computedStyle.lineHeight;
+      tempLine.style.fontSize = computedStyle.fontSize;
+      tempLine.style.position = 'absolute';
+      tempLine.style.visibility = 'hidden';
+      tempLine.innerHTML = 'A';
+      document.body.appendChild(tempLine);
+      const spaceHeight = tempLine.getBoundingClientRect().height;
+      document.body.removeChild(tempLine);
+
+      const tempSpan = document.createElement('span');
+      tempSpan.style.fontSize = getComputedStyle(textElement).fontSize;
+      tempSpan.innerHTML = ' ';
+      textElement.appendChild(tempSpan);
+      const spaceWidth = tempSpan.getBoundingClientRect().width; 
+      textElement.removeChild(tempSpan);
+
+      let i = 0;
+      
+      while (i < text.length) {
+        const char = text[i];
         
-        // --- THIS IS THE ENTIRE FIX ---
-        // Use a non-breaking space (&nbsp;). This gives the span
-        // a natural, measurable width based on the font.
-        // No inline styles are needed.
-        wrapped += `<span class="space">&nbsp;</span>`;
-        i++;
-
-      } else if (char === '\n') {
-        i++;
-      } else {
-        wrapped += `<span>${char}</span>`;
-        i++;
+        if (char === '<') {
+          let tag = '';
+          while (i < text.length && text[i] !== '>') {
+            tag += text[i];
+            i++;
+          }
+          if (i < text.length) {
+            tag += text[i];
+            i++;
+          }
+          wrapped += tag;
+        } else if (char === ' ') {
+          wrapped += `<span class="space" style="width: ${spaceWidth}px; height: ${spaceHeight}px;"> </span>`;
+          i++;
+        } else if (char === '\n') {
+          i++;
+        } else {
+          wrapped += `<span>${char}</span>`;
+          i++;
+        }
       }
-    }
-    
-    textElement.innerHTML = wrapped;
-    
-    world = new World(worldElement, {
-      gravity: 400,
-      friction: 0.97,
-      restitution: 0.5,
-      spatialGrid: true, // Enabled - optimized spatial grid with static body support
-      spatialGridCellSize: 25 // Smaller cells for better separation of clustered letters
-    });
-    
-    const spans = textElement.querySelectorAll('span');
-
-    spans.forEach((span) => {
-      const isSpace = span.classList.contains('space');
       
-      // --- DEBUG LOG ---
-      const content = span.innerHTML === '&nbsp;' ? '[space]' : span.innerHTML;
-      console.log('Creating body for:', content, '| isStatic:', isSpace);
-
-      const body = new Body(span, world, {
-        mass: 1,
-        radius: 8,
-        restitution: 0.6,
-        isStatic: isSpace // Spaces are static, letters are dynamic
+      textElement.innerHTML = wrapped;
+      
+      // SPATIAL GRID ENABLED - for comparison
+      // Using smaller cell size (25px) for text demos - letters are clustered together
+      world = new World(worldElement, {
+        gravity: 400,
+        friction: 0.97,
+        restitution: 0.5,
+        spatialGrid: true, // ENABLED - compare with demo-text.html
+        spatialGridCellSize: 25 // Smaller cells for better separation of clustered letters
       });
-
-      world.registerBody(body);
       
-      if (!isSpace) {
-        bodies.push(body);
-      }
-    });
-    
-    worldElement.classList.add('physics-active');
-    world.start();
-  }
+      const spans = textElement.querySelectorAll('span');
 
-      textElement.addEventListener('mousemove', (e) => {
+      spans.forEach((span) => {
+        const isSpace = span.classList.contains('space');
+        
+        const body = new Body(span, world, {
+          mass: 1,
+          radius: 8,
+          restitution: 0.6,
+          isStatic: isSpace
+        });
+
+        world.registerBody(body);
+        
+        if (!isSpace) {
+          bodies.push(body);
+        }
+      });
+      
+      worldElement.classList.add('physics-active');
+      world.start();
+      
+      console.log('World initialized with spatial grid ENABLED');
+      console.log('Total bodies:', world.bodies.length);
+      console.log('Dynamic bodies:', bodies.length);
+    }
+      
+    textElement.addEventListener('mousemove', (e) => {
       if (!initialized) {
         initializePhysics();
       }
@@ -289,6 +291,14 @@ function initializePhysics() {
           );
         }
       });
+    });
+    
+    // Cleanup
+    window.addEventListener('beforeunload', () => {
+      clearInterval(perfInterval);
+      if (world) {
+        world.stop();
+      }
     });
   </script>
 </body>

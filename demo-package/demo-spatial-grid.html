@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DOM Physics - Spatial Grid Performance Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background: #1a1a2e;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      color: #eee;
+    }
+    
+    h1 {
+      margin: 20px 0;
+      color: #fff;
+      text-align: center;
+    }
+    
+    #world {
+      position: relative;
+      width: 800px;
+      height: 600px;
+      background: #16213e;
+      border: 2px solid #0f3460;
+      overflow: visible;
+    }
+    
+    .particle {
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      background: #e94560;
+      border-radius: 50%;
+      box-shadow: 0 0 4px rgba(233, 69, 96, 0.5);
+    }
+    
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(26, 26, 46, 0.95);
+      padding: 15px;
+      border: 2px solid #0f3460;
+      border-radius: 4px;
+      z-index: 1000;
+      min-width: 200px;
+    }
+    
+    .controls h3 {
+      margin-bottom: 10px;
+      color: #e94560;
+      font-size: 14px;
+    }
+    
+    .controls button {
+      background: #0f3460;
+      color: #fff;
+      border: 1px solid #e94560;
+      padding: 8px 12px;
+      margin: 5px 5px 5px 0;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    
+    .controls button:hover {
+      background: #16213e;
+    }
+    
+    .controls button.active {
+      background: #e94560;
+      color: #fff;
+    }
+    
+    .stats {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(26, 26, 46, 0.95);
+      padding: 15px;
+      border: 2px solid #0f3460;
+      border-radius: 4px;
+      z-index: 1000;
+      min-width: 250px;
+      font-size: 12px;
+    }
+    
+    .stats h3 {
+      margin-bottom: 10px;
+      color: #e94560;
+      font-size: 14px;
+    }
+    
+    .stats div {
+      margin: 5px 0;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    .stats .label {
+      color: #aaa;
+    }
+    
+    .stats .value {
+      color: #fff;
+      font-weight: bold;
+    }
+    
+    .stats .good {
+      color: #4ade80;
+    }
+    
+    .stats .warning {
+      color: #fbbf24;
+    }
+    
+    .stats .bad {
+      color: #ef4444;
+    }
+    
+    .info {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(26, 26, 46, 0.95);
+      padding: 10px;
+      border: 2px solid #0f3460;
+      border-radius: 4px;
+      font-size: 11px;
+      color: #aaa;
+      max-width: 300px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Spatial Grid Performance Demo</h1>
+  
+  <div id="world"></div>
+  
+  <div class="controls">
+    <h3>Controls</h3>
+    <button id="addBodies">Add 50 Bodies</button>
+    <button id="clearBodies">Clear All</button>
+    <div style="margin-top: 10px;">
+      <button id="toggleGrid" class="active">Spatial Grid: ON</button>
+    </div>
+    <div style="margin-top: 10px; font-size: 11px; color: #aaa;">
+      Click in the world to add bodies<br>
+      Watch performance stats update
+    </div>
+  </div>
+  
+  <div class="stats">
+    <h3>Performance Stats</h3>
+    <div>
+      <span class="label">Bodies:</span>
+      <span class="value" id="bodyCount">0</span>
+    </div>
+    <div>
+      <span class="label">Collision Checks:</span>
+      <span class="value" id="collisionChecks">0</span>
+    </div>
+    <div>
+      <span class="label">Frame Time:</span>
+      <span class="value" id="frameTime">0</span>ms
+    </div>
+    <div>
+      <span class="label">FPS:</span>
+      <span class="value" id="fps">0</span>
+    </div>
+    <div>
+      <span class="label">Spatial Grid:</span>
+      <span class="value" id="gridStatus">Enabled</span>
+    </div>
+  </div>
+  
+  <div class="info">
+    <strong>Spatial Grid:</strong> Enabled by default for all worlds. Toggle it off to see
+    the performance difference. With spatial grid enabled, collision detection is O(n×k)
+    where k is bodies per cell, instead of O(n²). Add many bodies to see the impact!
+  </div>
+
+  <script type="module">
+    import { World, Body } from '/dist/index.js';
+    
+    const worldElement = document.getElementById('world');
+    let spatialGridEnabled = true;
+    let world = new World(worldElement, {
+      gravity: 400,
+      friction: 0.98,
+      restitution: 0.6,
+      spatialGrid: true
+    });
+    
+    const bodies = [];
+    
+    // Stats update function - reads from window.__domPhysicsStats
+    function updateStats() {
+      const stats = window.__domPhysicsStats;
+      if (stats) {
+        // Update body count
+        document.getElementById('bodyCount').textContent = stats.bodyCount || bodies.length;
+        
+        // Update collision checks
+        document.getElementById('collisionChecks').textContent = stats.collisionChecks || 0;
+        
+        // Update frame time
+        const frameTime = stats.totalTime || 0;
+        document.getElementById('frameTime').textContent = frameTime.toFixed(2);
+        
+        // Update FPS
+        const fps = frameTime > 0 ? 1000 / frameTime : 0;
+        const fpsElement = document.getElementById('fps');
+        fpsElement.textContent = fps.toFixed(1);
+        
+        // Color code FPS
+        fpsElement.className = 'value';
+        if (fps >= 55) {
+          fpsElement.classList.add('good');
+        } else if (fps >= 30) {
+          fpsElement.classList.add('warning');
+        } else {
+          fpsElement.classList.add('bad');
+        }
+        
+        // Update spatial grid status
+        const gridStatus = document.getElementById('gridStatus');
+        if (stats.spatialGridEnabled) {
+          gridStatus.textContent = 'Enabled';
+          gridStatus.className = 'value good';
+        } else {
+          gridStatus.textContent = 'Disabled';
+          gridStatus.className = 'value bad';
+        }
+      }
+    }
+    
+    // Update stats every frame
+    const statsInterval = setInterval(updateStats, 16); // ~60fps
+    
+    // Add body on click
+    worldElement.addEventListener('click', (e) => {
+      const rect = worldElement.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      const element = document.createElement('div');
+      element.className = 'particle';
+      element.style.left = `${x - 6}px`;
+      element.style.top = `${y - 6}px`;
+      worldElement.appendChild(element);
+      
+      const body = new Body(element, world);
+      world.registerBody(body);
+      bodies.push(body);
+      
+      updateBodyCount();
+    });
+    
+    // Add 50 bodies button
+    document.getElementById('addBodies').addEventListener('click', () => {
+      for (let i = 0; i < 50; i++) {
+        const x = Math.random() * 750 + 25;
+        const y = Math.random() * 550 + 25;
+        
+        const element = document.createElement('div');
+        element.className = 'particle';
+        element.style.left = `${x - 6}px`;
+        element.style.top = `${y - 6}px`;
+        worldElement.appendChild(element);
+        
+        const body = new Body(element, world);
+        world.registerBody(body);
+        bodies.push(body);
+      }
+      updateBodyCount();
+    });
+    
+    // Clear bodies button
+    document.getElementById('clearBodies').addEventListener('click', () => {
+      world.stop();
+      
+      // Remove all bodies
+      bodies.forEach(body => {
+        world.unregisterBody(body);
+        body.element.remove();
+      });
+      bodies.length = 0;
+      
+      // Recreate world to reset state
+      world = new World(worldElement, {
+        gravity: 400,
+        friction: 0.98,
+        restitution: 0.6,
+        spatialGrid: spatialGridEnabled
+      });
+      
+      world.start();
+      updateBodyCount();
+    });
+    
+    // Toggle spatial grid
+    document.getElementById('toggleGrid').addEventListener('click', () => {
+      spatialGridEnabled = !spatialGridEnabled;
+      
+      world.stop();
+      
+      // Recreate world with new spatial grid setting
+      world = new World(worldElement, {
+        gravity: 400,
+        friction: 0.98,
+        restitution: 0.6,
+        spatialGrid: spatialGridEnabled
+      });
+      
+      // Re-register all bodies
+      bodies.forEach(body => {
+        world.registerBody(body);
+      });
+      
+      world.start();
+      
+      const button = document.getElementById('toggleGrid');
+      const status = document.getElementById('gridStatus');
+      if (spatialGridEnabled) {
+        button.textContent = 'Spatial Grid: ON';
+        button.classList.add('active');
+        status.textContent = 'Enabled';
+        status.className = 'value good';
+      } else {
+        button.textContent = 'Spatial Grid: OFF';
+        button.classList.remove('active');
+        status.textContent = 'Disabled';
+        status.className = 'value bad';
+      }
+    });
+    
+    function updateBodyCount() {
+      document.getElementById('bodyCount').textContent = bodies.length;
+      updateStats(); // Also update other stats
+    }
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      clearInterval(statsInterval);
+      world.stop();
+    });
+    
+    // Start the simulation
+    world.start();
+    
+    // Initial stats update
+    updateStats();
+  </script>
+</body>
+</html>
